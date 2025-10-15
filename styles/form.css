@@ -1,0 +1,236 @@
+/* Page & section */
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Ubuntu,
+    Cantarell,
+    'Helvetica Neue',
+    Arial,
+    'Noto Sans',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji';
+  line-height: 1.6;
+}
+
+main.divider {
+  padding: clamp(1rem, calc(2vw + 0.5rem), 2.5rem);
+}
+
+section.purchase {
+  margin-inline: auto;
+  max-width: var(--maxw);
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.02),
+      transparent 40%
+    )
+    var(--card);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  padding: clamp(1rem, 2.5vw, 2rem);
+}
+
+h2 {
+  text-align: center;
+}
+.purchase h2 {
+  font-size: clamp(1.4rem, 1.2rem + 1vw, 2rem);
+  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.2px;
+}
+
+.purchase h3 {
+  font-size: 1.15rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.purchase h4 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+  color: #404040;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Form card/sections */
+.form-sect {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+/* Label + inputs */
+label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+label > input,
+#cc-info select,
+#cc-info input,
+.purchase input[type='text'],
+input[type='number'],
+select {
+  width: 100%;
+  appearance: none;
+  background: rgb(43, 88, 223);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+/* Placeholders */
+::placeholder {
+  color: #ccc;
+}
+
+/* Focus states */
+:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 65%, transparent);
+  border-color: var(--ring);
+}
+
+/* Valid/invalid UI (native constraint validation) */
+input:required:invalid,
+select:required:invalid {
+  border-color: color-mix(in oklab, var(--danger) 65%, transparent);
+}
+
+input:required:valid,
+select:required:valid {
+  border-color: color-mix(in oklab, var(--ok) 65%, transparent);
+}
+
+/* Zip input tweaks (numbers often show spinners; hide for cleaner UI) */
+input[type='number'] {
+  appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Credit card row */
+#cc-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--gap);
+  align-items: end;
+  margin-top: 0.25rem;
+}
+
+/* Submit area */
+#submit-div {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-button {
+  cursor: pointer;
+  background: #D97706;;
+  color: #fff;
+  border: none;
+  padding: 0.9rem 1.25rem;
+  font-weight: 700;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  transition:
+    transform 0.08s ease,
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 6px 18px rgba(194, 92, 3, 0.25);
+  padding: 1.5em;
+  width: 18vw;
+  min-width: 15px;
+}
+.submit-button:hover {
+  filter: brightness(1.05);
+}
+.submit-button:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+/* Helper for the nameplate block (optional) */
+#nameplate {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Headings stick a bit on long forms (nice on desktop) */
+@media (min-width: 900px) {
+  .purchase h3 {
+    position: sticky;
+    top: 0.5rem;
+  }
+}
+
+/* Responsive layout
+     - Mobile: single column (default)
+     - ≥600px: 2 columns for addresses
+     - ≥900px: nicer breathing room
+  */
+@media (min-width: 600px) {
+  .form-sect {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Make long rows span both columns */
+  .form-sect h4,
+  .form-sect h3,
+  #cc-info,
+  #submit-div,
+  input[type='hidden'] {
+    grid-column: 1 / -1;
+  }
+
+  /* Pair first/last names side by side naturally.
+       Because your HTML repeats "First Name" & "Last Name" across
+       sections, this keeps them aligned without needing extra classes. */
+  label[for='first-name'],
+  label[for='last-name'] {
+    margin: 0;
+  }
+}
+
+@media (min-width: 900px) {
+  section.purchase {
+    padding: 2.25rem 2.5rem;
+  }
+  .form-sect {
+    gap: var(--gap-lg);
+  }
+}
+
+/* Small utility: subtle separators between major blocks */
+.form-sect > h4 {
+  padding-top: 0.75rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+/* Accessibility: reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

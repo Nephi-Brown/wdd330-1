@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CineTrack — Details</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@600;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/base.css"><link rel="stylesheet" href="/styles/larger.css">
+  <script type="module" src="/js/details.js" defer></script>
+</head>
+<body>
+  <div id="main-head"></div>
+  <main>
+    <section class="wf wf--block center" aria-hidden="true">Details Wireframe: Poster + Meta + Actions + Similar</section>
+
+    <article class="ct-detail" id="detail">
+      <div class="ct-detail__poster">
+        <img id="poster" class="card__img" alt="Poster"/>
+      </div>
+      <div class="ct-detail__main">
+        <h1 id="title">Title</h1>
+        <div class="ct-detail__meta">
+          <span id="year" class="meta"></span>
+          <span id="runtime" class="meta"></span>
+          <span id="rating" class="badge" title="Rating"></span>
+        </div>
+        <p id="overview" class="meta"></p>
+        <div class="ct-actions">
+          <button id="fav-btn" class="btn btn--primary">Add to Favorites</button>
+          <button id="share-btn" class="btn btn--ghost">Share</button>
+        </div>
+      </div>
+    </article>
+
+    <section style="margin-top: 24px;">
+      <h2>Similar</h2>
+      <div id="similar-grid" class="ct-grid ct-grid--3"></div>
+    </section>
+  </main>
+  <div id="main-foot"></div>
+</body>
+</html>
