@@ -1,24 +1,67 @@
 <header class="ct-header">
+  <!-- ===== Top Bar: Brand + Search + Menu/Cart ===== -->
   <div class="ct-topbar">
-    <div class="ct-brand">
-      <div class="ct-brand__logo" aria-hidden="true">CT</div>
-      <div class="ct-brand__name">CineTrack</div>
-    </div>
+    <!-- Brand -->
+    <a class="ct-brand" href="/index.html" aria-label="CineTrack Home">
+      <img
+        src="images/cTLogo.webp"
+        alt="CineTrack logo"
+        width="50"
+        height="50"
+        class="ct-brand__logo-img"
+      />
+      <span class="ct-brand__name">CineTrack</span>
+    </a>
 
-    <form class="ct-search" role="search" aria-label="Search movies and TV">
-      <input id="global-search" type="search" placeholder="Search movies, TV shows..." />
-      <button id="global-search-btn" type="submit">Search</button>
+    <!-- Search -->
+    <form class="ct-search" role="search" aria-label="Search Movies or TV">
+      <input
+        id="global-search"
+        type="search"
+        placeholder="Search movies, TV shows..."
+        aria-label="Search movies and TV shows"
+      />
+      <button id="global-search-btn" type="submit" aria-label="Search">
+        🔍
+      </button>
     </form>
 
-    <button id="menu" aria-label="Toggle navigation menu"></button>
+    <!-- Right Controls -->
+    <div class="ct-actions-right">
+      <!-- Mobile Hamburger -->
+      <button
+        id="menu"
+        aria-label="Toggle navigation menu"
+        aria-expanded="false"
+      ></button>
+
+      <!-- Favorites / Cart Icon -->
+      <a href="/favorites.html" class="cart-btn" aria-label="View Favorites">
+        <img
+          class="cart-img"
+          src="images/heartIcon.webp"
+          width="28"
+          height="28"
+          alt="Favorites"
+          aria-hidden="true"
+        />
+        <span
+          class="cart-count hide"
+          aria-live="polite"
+          aria-atomic="true"
+          >0</span
+        >
+      </a>
+    </div>
   </div>
 
+  <!-- ===== Main Navigation ===== -->
   <nav class="ct-navwrap" id="navwrap">
-    <div class="ct-nav" role="navigation" aria-label="Primary">
-      <a href="/index.html" class="active">Home</a>
-      <a href="/movies.html">Movies</a>
-      <a href="/tv.html">TV Shows</a>
-      <a href="/favorites.html">Favorites</a>
-    </div>
+    <ul class="ct-nav" role="navigation" aria-label="Primary">
+      <li><a href="/index.html" class="active">Home</a></li>
+      <li><a href="/movies.html">Movies</a></li>
+      <li><a href="/tv.html">TV Shows</a></li>
+      <li><a href="/favorites.html">Favorites</a></li>
+    </ul>
   </nav>
 </header>

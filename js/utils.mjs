@@ -1,11 +1,11 @@
-import ProductData from "./ExternalServices.mjs";
+// ===== utils.mjs (no missing imports) =====
 
 // qs: querySelector wrapper
 export function qs(selector, parent = document) {
   return parent.querySelector(selector);
 }
 
-// LocalStorage helpers (kept behavior for 'so-cart')
+// LocalStorage helpers
 export function getLocalStorage(key) {
   try {
     const data = JSON.parse(localStorage.getItem(key));
@@ -55,9 +55,7 @@ export async function loadTemplate(path) {
   return await res.text();
 }
 
-/* === Header/Footer loader (robust path fallbacks) ===
-   Looks for /partials/header.html (preferred),
-   then ./header.html, then ../partials/header.html */
+/* === Header/Footer loader with robust paths === */
 async function tryFetch(paths) {
   for (const p of paths) {
     try {
@@ -69,32 +67,47 @@ async function tryFetch(paths) {
 }
 
 export async function loadHeaderFooter() {
-  const headerElement = document.querySelector("#main-head") || document.body.prepend(document.createElement('div'));
-  const footerElement = document.querySelector("#main-foot") || document.body.append(document.createElement('div'));
+  // Ensure mount points exist
+  if (!document.querySelector('#main-head')) {
+    const headDiv = document.createElement('div'); headDiv.id = 'main-head';
+    document.body.prepend(headDiv);
+  }
+  if (!document.querySelector('#main-foot')) {
+    const footDiv = document.createElement('div'); footDiv.id = 'main-foot';
+    document.body.append(footDiv);
+  }
 
-  // header
+  // HEADER
   const headerHTML = await tryFetch([
-    "/partials/header.html", "./partials/header.html", "../partials/header.html", "./header.html", "../header.html"
+    '/partials/header.html',
+    '/public/partials/header.html',
+    './partials/header.html',
+    '../partials/header.html',
+    './header.html',
+    '../header.html'
   ]);
   if (headerHTML) {
-    (document.querySelector("#main-head") || document.body.firstElementChild).outerHTML =
-      `<div id="main-head">${headerHTML}</div>`;
+    document.querySelector('#main-head').outerHTML = `<div id="main-head">${headerHTML}</div>`;
   }
 
-  // footer
+  // FOOTER
   const footerHTML = await tryFetch([
-    "/partials/footer.html", "./partials/footer.html", "../partials/footer.html", "./footer.html", "../footer.html"
+    '/partials/footer.html',
+    '/public/partials/footer.html',
+    './partials/footer.html',
+    '../partials/footer.html',
+    './footer.html',
+    '../footer.html'
   ]);
   if (footerHTML) {
-    (document.querySelector("#main-foot") || document.body.lastElementChild).outerHTML =
-      `<div id="main-foot">${footerHTML}</div>`;
+    document.querySelector('#main-foot').outerHTML = `<div id="main-foot">${footerHTML}</div>`;
   }
 
-  // init year
-  const currentYearElement = document.getElementById("currentyear");
+  // Footer dates
+  const currentYearElement = document.getElementById('currentyear');
   if (currentYearElement) currentYearElement.textContent = new Date().getFullYear();
 
-  // init mobile nav toggle
+  // Mobile nav toggle
   const mainnavWrap = document.getElementById('navwrap');
   const hamButton = document.getElementById('menu');
   if (hamButton && mainnavWrap) {
@@ -120,15 +133,14 @@ export async function loadHeaderFooter() {
   }
 }
 
-// Legacy cart-related helpers (safe no-ops if not present)
+// Legacy cart helpers (safe no-ops if not present)
 export function updateCartBadge() {
   const cart = getLocalStorage('so-cart') || [];
   const badge = document.querySelector('.cart-count');
   if (!badge) return;
   const totalCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
   badge.textContent = totalCount;
-  if (totalCount > 0) badge.classList.remove('hide');
-  else badge.classList.add('hide');
+  if (totalCount > 0) badge.classList.remove('hide'); else badge.classList.add('hide');
 }
 export function bounceCartIcon() {
   const cartIcon = document.querySelector('.cart');
@@ -150,8 +162,7 @@ export function alertMessage(message, scroll = true) {
   main.prepend(alert);
   if(scroll) window.scrollTo(0,0);
 }
-
 export function removeAllAlerts() {
-  const alerts = document.querySelectorAll(".alert");
-  alerts.forEach((alert) => document.querySelector("main").removeChild(alert));
+  const alerts = document.querySelectorAll('.alert');
+  alerts.forEach((alert) => document.querySelector('main').removeChild(alert));
 }

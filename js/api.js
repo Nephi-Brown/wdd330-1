@@ -1,6 +1,6 @@
 // Simple API layer. Plug in your keys.
-const TMDB_KEY = 'YOUR_TMDB_KEY';
-const OMDB_KEY = 'YOUR_OMDB_KEY';
+const TMDB_KEY = 'c1a89be078d63cf07b398d0e7a71a591';
+const OMDB_KEY = 'e564883a';
 const TMDB = 'https://api.themoviedb.org/3';
 const IMG = 'https://image.tmdb.org/t/p/w500';
 

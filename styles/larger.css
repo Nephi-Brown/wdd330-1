@@ -1,15 +1,15 @@
 /* Desktop refinements (≥ 760px) */
 
 @media (min-width: 760px){
-  /* Header layout: row navigation visible, hide hamburger-expanded stack */
+  /* Header layout: show row nav, hide hamburger-expanded stack */
   .ct-topbar{ grid-template-columns: auto 1fr auto; }
   .ct-navwrap{ display:block !important; }
   #menu{ display:none; }
 
   .ct-nav{
-    display:flex; gap: 8px; padding: 8px 16px 16px;
+    display:flex; gap: 8px; padding: 10px 0 16px; justify-content: center;
   }
 
-  /* Search width on desktop */
+  /* Search width on desktop (generous, like screenshot) */
   .ct-search{ max-width: 520px; margin-left: auto; }
 }
