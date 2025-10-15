@@ -40,7 +40,7 @@ function initSearch(){
     e.preventDefault();
     const q = input?.value?.trim();
     if (!q) return;
-    window.location.href = `/movies.html?q=${encodeURIComponent(q)}`;
+    window.location.href = `movies.html?q=${encodeURIComponent(q)}`;
   });
 }
 

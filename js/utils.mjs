@@ -79,12 +79,7 @@ export async function loadHeaderFooter() {
 
   // HEADER
   const headerHTML = await tryFetch([
-    '/partials/header.html',
-    '/public/partials/header.html',
-    './partials/header.html',
-    '../partials/header.html',
-    './header.html',
-    '../header.html'
+    'public/partials/header.html',
   ]);
   if (headerHTML) {
     document.querySelector('#main-head').outerHTML = `<div id="main-head">${headerHTML}</div>`;
@@ -92,12 +87,7 @@ export async function loadHeaderFooter() {
 
   // FOOTER
   const footerHTML = await tryFetch([
-    '/partials/footer.html',
-    '/public/partials/footer.html',
-    './partials/footer.html',
-    '../partials/footer.html',
-    './footer.html',
-    '../footer.html'
+    'public/partials/footer.html',
   ]);
   if (footerHTML) {
     document.querySelector('#main-foot').outerHTML = `<div id="main-foot">${footerHTML}</div>`;

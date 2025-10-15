@@ -8,7 +8,7 @@ function card(item){
       <h3>${item.title}</h3>
       <p class="meta">${item.year || ''} — ${item.type.toUpperCase()}</p>
       <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-        <a class="btn btn--ghost" href="/details.html?id=${item.id}&type=${item.type}">Details</a>
+        <a class="btn btn--ghost" href="details.html?id=${item.id}&type=${item.type}">Details</a>
         <button class="btn btn--primary" data-remove="${item.id}|${item.type}">Remove</button>
       </div>
     </div>
