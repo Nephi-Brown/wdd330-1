@@ -3,7 +3,7 @@ import { tmdb, normalizeMedia } from './api.js';
 
 function mediaCard(item){
   return `
-  <a class="card" href="/details.html?id=${item.id}&type=${item.type}">
+  <a class="card" href="details.html?id=${item.id}&type=${item.type}">
     <img class="card__img" src="${item.poster}" alt="${item.title}">
     <div class="card__body">
       <h3>${item.title}</h3>
