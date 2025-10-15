@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const path = window.location.pathname;
   const params = new URLSearchParams(location.search);
 
-  // Root home only
   const isHome = /^(?:\/|\/index\.html)$/.test(path);
 
   if (isHome) {
@@ -13,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // helpers
   const getCategoryFromParam = () =>
     params.get('category')?.charAt(0).toUpperCase() +
       params.get('category')?.slice(1) || null;
@@ -24,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = h2.textContent.toLowerCase();
     const keywords = ['music', 'theatre', 'cinema', 'sport'];
 
-    // Look for the first keyword in the h2 text
     const match = keywords.find((word) => text.includes(word));
 
     return match ? match.charAt(0).toUpperCase() + match.slice(1) : 'Product';
@@ -60,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (isList) {
-    // product list: "Category -> (N items)"
     const listEl = document.querySelector('.product-list');
 
     const update = () => {
@@ -76,14 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
       setCrumb(`<span>${category}</span> &gt; <span>(${count} items)</span>`);
     };
 
-    // Products may render async; observe for when cards appear
     const observer = new MutationObserver(update);
     observer.observe(listEl, { childList: true });
 
-    update(); // initial
+    update(); 
     return;
   }
 
-  // Other pages: hide by default
   crumb.style.display = 'none';
 });

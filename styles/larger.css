@@ -1,7 +1,4 @@
-/* Desktop refinements (≥ 760px) */
-
 @media (min-width: 760px){
-  /* Header layout: show row nav, hide hamburger-expanded stack */
   .ct-topbar{ grid-template-columns: auto 1fr auto; }
   .ct-navwrap{ display:block !important; }
   #menu{ display:none; }

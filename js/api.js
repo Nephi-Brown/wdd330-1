@@ -1,4 +1,3 @@
-// Simple API layer. Plug in your keys.
 const TMDB_KEY = 'c1a89be078d63cf07b398d0e7a71a591';
 const OMDB_KEY = 'e564883a';
 const TMDB = 'https://api.themoviedb.org/3';
@@ -23,7 +22,6 @@ export async function omdb(params = {}){
 }
 
 export function normalizeMedia(m, type){
-  // type: 'movie' or 'tv'
   const title = type === 'movie' ? m.title : m.name;
   const year = (type === 'movie' ? m.release_date : m.first_air_date || '').slice(0,4) || '';
   return {
