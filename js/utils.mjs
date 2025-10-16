@@ -1,4 +1,4 @@
-// ===== utils.mjs (no missing imports) =====
+// ===== utils.mjs (Fix B: dynamic favorites badge) =====
 
 // qs: querySelector wrapper
 export function qs(selector, parent = document) {
@@ -16,6 +16,8 @@ export function getLocalStorage(key) {
 }
 export function setLocalStorage(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
+  // Update favorites badge immediately when favorites change
+  if (key === 'ct-favorites') updateFavCount();
 }
 
 // Click helper
@@ -93,11 +95,11 @@ export async function loadHeaderFooter() {
     document.querySelector('#main-foot').outerHTML = `<div id="main-foot">${footerHTML}</div>`;
   }
 
-  // Footer dates
+  // Footer current year
   const currentYearElement = document.getElementById('currentyear');
   if (currentYearElement) currentYearElement.textContent = new Date().getFullYear();
 
-  // Mobile nav toggle
+  // Init mobile nav toggle
   const mainnavWrap = document.getElementById('navwrap');
   const hamButton = document.getElementById('menu');
   if (hamButton && mainnavWrap) {
@@ -121,7 +123,34 @@ export async function loadHeaderFooter() {
     resetForDesktop();
     window.addEventListener('resize', resetForDesktop);
   }
+
+  // ✅ Update favorites badge now that header exists
+  updateFavCount();
 }
+
+// ===== Favorites badge updater (Fix B) =====
+export function updateFavCount() {
+  let count = 0;
+  try {
+    const favs = JSON.parse(localStorage.getItem('ct-favorites') || '[]');
+    count = Array.isArray(favs) ? favs.length : 0;
+  } catch { count = 0; }
+
+  const badge = document.getElementById('fav-count');
+  if (!badge) return;
+
+  if (count > 0) {
+    badge.textContent = String(count);
+  } else {
+    // Empty string hides the badge via CSS :empty
+    badge.textContent = '';
+  }
+}
+
+// Keep multiple tabs in sync
+window.addEventListener('storage', (e) => {
+  if (e.key === 'ct-favorites') updateFavCount();
+});
 
 // Legacy cart helpers (safe no-ops if not present)
 export function updateCartBadge() {

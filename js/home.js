@@ -1,13 +1,22 @@
-import { loadHeaderFooter } from './utils.mjs';
-import { tmdb, normalizeMedia } from './api.js';
+// js/home.js
+// Renders 15 cards and shows: Year — Media Type (Genre, Genre)
 
+import { loadHeaderFooter } from './utils.mjs';
+import { tmdb, toMediaList } from './api.js';
+
+/* Card template */
 function mediaCard(item){
+  const genreText = item.genres && item.genres.length ? ` (${item.genres.join(', ')})` : '';
+  const metaLine = `${item.year || '—'} — ${item.typeLabel}${genreText}`;
+
   return `
   <a class="card" href="details.html?id=${item.id}&type=${item.type}">
-    <img class="card__img" src="${item.poster}" alt="${item.title}">
+    <div class="card__media">
+      <img class="card__img" src="${item.poster}" alt="${item.title}">
+    </div>
     <div class="card__body">
       <h3>${item.title}</h3>
-      <p class="meta">${item.year || ''}</p>
+      <p class="meta">${metaLine}</p>
       ${item.rating ? `<span class="badge">★ ${item.rating}</span>` : ''}
     </div>
   </a>`;
@@ -15,20 +24,26 @@ function mediaCard(item){
 
 async function loadTrending(){
   const data = await tmdb('trending/all/day');
-  const list = data.results.slice(0,9).map(r => normalizeMedia(r, r.media_type));
-  document.getElementById('trending-grid').innerHTML = list.map(mediaCard).join('');
+  const raw = (data.results || [])
+    .filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+    .slice(0, 15);
+  const list = await toMediaList(raw); // mixed list → movie + tv genre maps
+  const el = document.getElementById('trending-grid');
+  if (el) el.innerHTML = list.map(mediaCard).join('');
 }
 
 async function loadMovies(){
   const data = await tmdb('movie/popular', { page: 1 });
-  const list = data.results.slice(0,9).map(r => normalizeMedia(r, 'movie'));
+  const raw = (data.results || []).slice(0, 15);
+  const list = await toMediaList(raw, 'movie'); // single type → faster
   const el = document.getElementById('movies-grid');
   if (el) el.innerHTML = list.map(mediaCard).join('');
 }
 
 async function loadTV(){
   const data = await tmdb('tv/popular', { page: 1 });
-  const list = data.results.slice(0,9).map(r => normalizeMedia(r, 'tv'));
+  const raw = (data.results || []).slice(0, 15);
+  const list = await toMediaList(raw, 'tv'); // single type → faster
   const el = document.getElementById('tv-grid');
   if (el) el.innerHTML = list.map(mediaCard).join('');
 }

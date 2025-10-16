@@ -1,3 +1,8 @@
+/* =========================
+   CineTrack — base.css
+   (Refreshed to prior style)
+   ========================= */
+
 * { box-sizing: border-box; }
 
 :root{
@@ -23,6 +28,8 @@ html, body{
   line-height: 1.55;
 }
 
+img{ max-width:100%; height:auto; display:block; }
+
 h1,h2,h3,h4{
   font-family: 'Roboto', 'Open Sans', Arial, sans-serif;
   margin: 0 0 .5rem 0;
@@ -45,7 +52,7 @@ header.ct-header{
   grid-template-columns: auto 1fr auto;
   gap: 16px;
   align-items: center;
-  padding: 20px 16px; /* slightly taller, like screenshot */
+  padding: 20px 16px; /* slightly taller */
 }
 
 .ct-brand{
@@ -85,7 +92,7 @@ header.ct-header{
 #menu::before{ content:"☰"; }
 #menu.show::before{ content:"❎"; }
 
-/* Primary nav (centered like screenshot) */
+/* Primary nav (centered) */
 .ct-navwrap{ display:none; }
 .ct-nav{
   display:flex; gap: 8px; padding: 10px 0 14px;
@@ -102,12 +109,33 @@ header.ct-header{
 /* Mobile: toggled open */
 .ct-navwrap.show{ display:block; }
 
+/* ===== Favorites in header (preserved behavior) ===== */
+/* This block maintains the existing favorites badge behavior and styles */
+.fav-link{ position: relative; display:inline-flex; align-items:center; text-decoration:none; }
+.fav-icon{ display:block; }
+.fav-badge{
+  position:absolute;
+  top:-4px; right:-6px;
+  min-width:18px; height:18px;
+  padding:0 5px;
+  border-radius:999px;
+  background: var(--ct-red);
+  color:#fff;
+  font-weight:700;
+  font-size:12px;
+  line-height:18px;
+  text-align:center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+/* Hide the badge when it's empty — utils.mjs sets empty text to hide */
+.fav-badge:empty{ display:none; }
+
 /* ===== Main ===== */
 main{ 
   max-width: 1200px; margin: 18px auto; padding: 0 16px;
 }
 
-/* ===== Cards and grids ===== */
+/* Cards and grids */
 .ct-grid{
   display:grid; gap: 16px;
 }
@@ -115,17 +143,72 @@ main{
 @media (min-width: 640px){ .ct-grid--3{ grid-template-columns: repeat(2, 1fr);} }
 @media (min-width: 960px){ .ct-grid--3{ grid-template-columns: repeat(3, 1fr);} }
 
+/* === Card: layout unchanged, hover only on the image area === */
 .card{
-  background: #fff; border-radius: var(--radius); box-shadow: var(--shadow);
+  display:block;
+  background:#fff;
+  border-radius:16px;
   overflow:hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.22);
+  transition: transform .25s ease, box-shadow .25s ease;
+  text-decoration: none;
 }
+.card:hover{
+  transform: translateY(-6px);
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+}
+
+/* Wrap the poster so we can target the image only */
+.card__media{
+  position: relative;
+  overflow: hidden; /* clips zoom to rounded corners */
+}
+
+/* Poster */
 .card__img{
-  width:100%; aspect-ratio: 16/9; object-fit: cover; display:block;
-  background: #e5e7eb;
+  width:100%;
+  display:block;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background:#e5e7eb;
+  transition: transform .35s ease;
 }
-.card__body{ padding: 12px 14px; }
+
+/* Soft vignette on hover (for readability over busy images) */
+.card__media::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.25) 100%);
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+/* Hover only affects the image area */
+.card:hover .card__img{ transform: scale(1.06); }
+.card:hover .card__media::after{ opacity: 1; }
+
+/* Body/info */
+.card__body{ padding: 16px; background:#fff; }
+.card__body h3{
+  margin: 0 0 6px 0;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.25;
+  text-decoration: underline;
+}
 .meta{ color: var(--ct-mid); font-size: .95rem; }
-.badge{ display:inline-block; padding: 2px 8px; border-radius: 999px; background: var(--ct-gold); color:#111; font-weight:800; }
+
+/* Rating badge */
+.badge{
+  display:inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--ct-gold);
+  color:#111;
+  font-weight:800;
+}
 
 /* ===== Media detail layout ===== */
 .ct-detail{
@@ -137,8 +220,12 @@ main{
     align-items: start;
   }
 }
-.ct-detail__poster{
-  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); background:#fff;
+.ct-detail__poster img{
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 9;   /* same as .card__img on small screens */
+  object-fit: cover;
+  border-radius: var(--radius);
 }
 .ct-detail__main{
   background:#fff; border-radius: var(--radius); box-shadow: var(--shadow);
@@ -188,3 +275,23 @@ footer.ct-footer{
   outline-offset: 6px;
 }
 .wf--block{ min-height: 120px; display:grid; place-items:center; color:#6b7280; }
+
+/* Details info block refinements */
+#detail-info .detail-head { gap: 12px; }
+#detail-info #detail-title { line-height: 1.15; }
+#detail-info .badge { font-size: 1rem; }
+
+/* === Detail Info Typography === */
+#detail-type,
+#detail-genres {
+  font-weight: 700;            /* bold */
+  font-size: 1.05rem;          /* slightly larger than body text */
+  color: var(--ct-dark);
+}
+
+#detail-overview {
+  font-size: 1.05rem;          /* match genre/media type size */
+  line-height: 1.55;
+  color: var(--ct-mid);
+  margin-top: 0.5rem;
+}

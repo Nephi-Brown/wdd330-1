@@ -10,3 +10,14 @@
   /* Search width on desktop (generous, like screenshot) */
   .ct-search{ max-width: 520px; margin-left: auto; }
 }
+
+/* === Larger screens: taller card images === */
+@media (min-width: 760px) {
+  .card__img{
+    aspect-ratio: 3 / 4; /* Taller images on desktop */
+  }
+
+  .ct-detail__poster img{
+    aspect-ratio: 2 / 3; /* Taller detail poster */
+  }
+}
