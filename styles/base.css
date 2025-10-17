@@ -500,3 +500,81 @@ footer.ct-footer {
   }
 }
 
+/* === Favorites badge counter === */
+.fav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.fav-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626; /* red badge */
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--ct-blue); /* subtle border for contrast */
+}
+
+/* hide badge entirely when empty */
+.fav-badge:empty {
+  display: none;
+}
+
+/* === Mobile header: brand (L) + icons (R) on first row; search below === */
+@media (max-width: 640px) {
+  .ct-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between; /* spread brand and icons */
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  /* Row 1: brand left */
+  .ct-brand {
+    order: 1;
+    flex: 0 1 auto;
+  }
+
+  /* Row 1: icons right (hamburger + favorites) */
+  .ct-actions-right {
+    order: 2;                 /* comes before search */
+    margin-left: auto;        /* push to far right */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Row 2: search full width */
+  .ct-search {
+    order: 3;                 /* after brand + icons */
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  /* Tidy up icon sizes */
+  #menu {
+    width: 26px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+  .fav-link img,
+  .fav-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
