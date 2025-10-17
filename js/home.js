@@ -122,62 +122,45 @@ function ensureMoviesUI() {
     `;
     main.appendChild(sec);
     grid = $('#movies-grid');
-  } else {
-    // If grid exists but no panel/toggle, insert them above
-    if (!$('#filter-toggle')) {
-      const wrap = document.createElement('div');
-      wrap.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-          <h2 style="margin:0;">Movies</h2>
-          <button id="filter-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="filter-panel" type="button">Filters & Sort</button>
-        </div>
-        <div id="filter-panel" class="ct-collapsible" hidden>
-          <form id="filter-form" class="ct-filterbar">
-            <fieldset class="ct-filter-group">
-              <label class="ct-sortlabel" for="movies-sort-by">Sort:</label>
-              <select id="movies-sort-by">
-                <option value="pop-desc">Popularity (desc)</option>
-                <option value="rating-desc">Rating (desc)</option>
-                <option value="year-desc">Year (new → old)</option>
-                <option value="year-asc">Year (old → new)</option>
-                <option value="title-asc">Title (A–Z)</option>
-                <option value="title-desc">Title (Z–A)</option>
-              </select>
-            </fieldset>
-            <div class="genre-scroller" id="movies-genre-scroller"></div>
-            <div class="ct-filter-actions">
-              <button id="movies-apply" class="btn btn--primary" type="button">Apply</button>
-              <button id="movies-clear" class="btn btn--ghost" type="button">Clear</button>
-            </div>
-          </form>
-        </div>
-      `;
-      grid.parentNode.insertBefore(wrap, grid);
-      const pager = document.createElement('div');
-      pager.id = 'movies-pagination';
-      pager.className = 'ct-pagination';
-      pager.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:1rem;margin-top:1rem;';
-      grid.after(pager);
-    }
   }
   bindCollapsible('#filter-toggle', '#filter-panel');
   return grid;
 }
 
+// Query either page-specific or generic controls (to support both HTML variants)
+const MSEL = {
+  sort: () => $('#movies-sort-by') || $('#sort-by'),
+  scroller: () => $('#movies-genre-scroller') || $('#genre-scroller'),
+  applyBtn: () => $('#movies-apply') || $('#apply-filters'),
+  clearBtn: () => $('#movies-clear') || $('#clear-filters'),
+  pager: () => $('#movies-pagination')
+};
+
 function renderMoviesGenreScroller(map) {
-  const scroller = $('#movies-genre-scroller');
+  const scroller = MSEL.scroller();
   if (!scroller) return;
   const names = Object.values(map).sort((a,b)=>a.localeCompare(b));
+
   scroller.innerHTML = names.map(n =>
-    `<button class="genre-chip" data-name="${n}" aria-pressed="${moviesState.selectedGenres.has(n)}">${n}</button>`
+    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${moviesState.selectedGenres.has(n)}">${n}</button>`
   ).join('');
-  $$('#movies-genre-scroller .genre-chip').forEach(btn => {
-    btn.onclick = () => {
-      const n = btn.dataset.name;
-      const on = btn.getAttribute('aria-pressed') === 'true';
-      btn.setAttribute('aria-pressed', String(!on));
-      if (on) moviesState.selectedGenres.delete(n); else moviesState.selectedGenres.add(n);
-    };
+
+  // Click + keyboard toggle, no submit
+  const toggleChip = (btn) => {
+    const n = btn.dataset.name;
+    const on = btn.getAttribute('aria-pressed') === 'true';
+    btn.setAttribute('aria-pressed', String(!on));
+    if (on) moviesState.selectedGenres.delete(n); else moviesState.selectedGenres.add(n);
+  };
+
+  $$('.genre-chip', scroller).forEach(btn => {
+    btn.addEventListener('click', () => toggleChip(btn));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        toggleChip(btn);
+      }
+    });
   });
 }
 
@@ -196,13 +179,17 @@ function sortList(list, sort) {
 }
 
 function applyMoviesFilterSort() {
-  const sort = $('#movies-sort-by')?.value || 'pop-desc';
+  const sortSel = MSEL.sort();
+  const sort = sortSel?.value || 'pop-desc';
   const genres = Array.from(moviesState.selectedGenres);
+
   let next = moviesState.source.filter(i => {
     if (!genres.length) return true;
     const g = i.genres || [];
-    return genres.every(n => g.includes(n));
+    // OR logic: keep if ANY selected genre is present
+    return genres.some(n => g.includes(n));
   });
+
   moviesState.view = sortList(next, sort);
   moviesState.currentPage = 1;
   renderMoviesPage();
@@ -219,7 +206,7 @@ function renderMoviesPage() {
   grid.innerHTML = pageItems.length ? pageItems.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
   revealStaggered(grid);
 
-  const pager = $('#movies-pagination');
+  const pager = MSEL.pager();
   if (pager) {
     pager.innerHTML = `
       <button class="btn btn--ghost" id="movies-prev" ${moviesState.currentPage===1?'disabled':''}>Prev</button>
@@ -232,7 +219,6 @@ function renderMoviesPage() {
 }
 
 async function initMoviesPage(){
-  // Run only on movies.html
   if (!location.pathname.toLowerCase().endsWith('movies.html')) return;
   const grid = ensureMoviesUI();
   renderSkeletonCards('movies-grid', 8);
@@ -245,7 +231,6 @@ async function initMoviesPage(){
     const genresMap = {};
     (genreList.genres || []).forEach(g => genresMap[g.id] = g.name);
 
-    // normalize and keep many, we paginate to 15
     const raw = (popular.results || []);
     moviesState.source = await toMediaList(raw, 'movie');
     moviesState.view   = moviesState.source.slice();
@@ -253,15 +238,16 @@ async function initMoviesPage(){
     renderMoviesGenreScroller(genresMap);
     applyMoviesFilterSort();
 
-    // controls
-    $('#movies-apply')?.addEventListener('click', applyMoviesFilterSort);
-    $('#movies-clear')?.addEventListener('click', () => {
+    // controls – support both ID schemes
+    MSEL.applyBtn()?.addEventListener('click', applyMoviesFilterSort);
+    MSEL.clearBtn()?.addEventListener('click', () => {
       moviesState.selectedGenres.clear();
-      $('#movies-sort-by').value = 'pop-desc';
+      const s = MSEL.sort();
+      if (s) s.value = 'pop-desc';
       renderMoviesGenreScroller(genresMap);
       applyMoviesFilterSort();
     });
-    $('#movies-sort-by')?.addEventListener('change', applyMoviesFilterSort);
+    MSEL.sort()?.addEventListener('change', applyMoviesFilterSort);
   } catch (e) {
     console.error('Movies load error:', e);
     grid.innerHTML = `<p class="meta">Failed to load movies.</p>`;
@@ -314,72 +300,58 @@ function ensureTVUI() {
     `;
     main.appendChild(sec);
     grid = $('#tv-grid');
-  } else {
-    if (!$('#filter-toggle')) {
-      const wrap = document.createElement('div');
-      wrap.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-          <h2 style="margin:0;">TV Shows</h2>
-          <button id="filter-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="filter-panel" type="button">Filters & Sort</button>
-        </div>
-        <div id="filter-panel" class="ct-collapsible" hidden>
-          <form id="filter-form" class="ct-filterbar">
-            <fieldset class="ct-filter-group">
-              <label class="ct-sortlabel" for="tv-sort-by">Sort:</label>
-              <select id="tv-sort-by">
-                <option value="pop-desc">Popularity (desc)</option>
-                <option value="rating-desc">Rating (desc)</option>
-                <option value="year-desc">Year (new → old)</option>
-                <option value="year-asc">Year (old → new)</option>
-                <option value="title-asc">Title (A–Z)</option>
-                <option value="title-desc">Title (Z–A)</option>
-              </select>
-            </fieldset>
-            <div class="genre-scroller" id="tv-genre-scroller"></div>
-            <div class="ct-filter-actions">
-              <button id="tv-apply" class="btn btn--primary" type="button">Apply</button>
-              <button id="tv-clear" class="btn btn--ghost" type="button">Clear</button>
-            </div>
-          </form>
-        </div>
-      `;
-      grid.parentNode.insertBefore(wrap, grid);
-      const pager = document.createElement('div');
-      pager.id = 'tv-pagination';
-      pager.className = 'ct-pagination';
-      pager.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:1rem;margin-top:1rem;';
-      grid.after(pager);
-    }
   }
   bindCollapsible('#filter-toggle', '#filter-panel');
   return grid;
 }
 
+const TVSEL = {
+  sort: () => $('#tv-sort-by') || $('#sort-by'),
+  scroller: () => $('#tv-genre-scroller') || $('#genre-scroller'),
+  applyBtn: () => $('#tv-apply') || $('#apply-filters'),
+  clearBtn: () => $('#tv-clear') || $('#clear-filters'),
+  pager: () => $('#tv-pagination')
+};
+
 function renderTVGenreScroller(map) {
-  const scroller = $('#tv-genre-scroller');
+  const scroller = TVSEL.scroller();
   if (!scroller) return;
   const names = Object.values(map).sort((a,b)=>a.localeCompare(b));
+
   scroller.innerHTML = names.map(n =>
-    `<button class="genre-chip" data-name="${n}" aria-pressed="${tvState.selectedGenres.has(n)}">${n}</button>`
+    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${tvState.selectedGenres.has(n)}">${n}</button>`
   ).join('');
-  $$('#tv-genre-scroller .genre-chip').forEach(btn => {
-    btn.onclick = () => {
-      const n = btn.dataset.name;
-      const on = btn.getAttribute('aria-pressed') === 'true';
-      btn.setAttribute('aria-pressed', String(!on));
-      if (on) tvState.selectedGenres.delete(n); else tvState.selectedGenres.add(n);
-    };
+
+  const toggleChip = (btn) => {
+    const n = btn.dataset.name;
+    const on = btn.getAttribute('aria-pressed') === 'true';
+    btn.setAttribute('aria-pressed', String(!on));
+    if (on) tvState.selectedGenres.delete(n); else tvState.selectedGenres.add(n);
+  };
+
+  $$('.genre-chip', scroller).forEach(btn => {
+    btn.addEventListener('click', () => toggleChip(btn));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        toggleChip(btn);
+      }
+    });
   });
 }
 
 function applyTVFilterSort() {
-  const sort = $('#tv-sort-by')?.value || 'pop-desc';
+  const sortSel = TVSEL.sort();
+  const sort = sortSel?.value || 'pop-desc';
   const genres = Array.from(tvState.selectedGenres);
+
   let next = tvState.source.filter(i => {
     if (!genres.length) return true;
     const g = i.genres || [];
-    return genres.every(n => g.includes(n));
+    // OR logic: keep if ANY selected genre is present
+    return genres.some(n => g.includes(n));
   });
+
   tvState.view = sortList(next, sort);
   tvState.currentPage = 1;
   renderTVPage();
@@ -396,7 +368,7 @@ function renderTVPage() {
   grid.innerHTML = pageItems.length ? pageItems.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
   revealStaggered(grid);
 
-  const pager = $('#tv-pagination');
+  const pager = TVSEL.pager();
   if (pager) {
     pager.innerHTML = `
       <button class="btn btn--ghost" id="tv-prev" ${tvState.currentPage===1?'disabled':''}>Prev</button>
@@ -428,15 +400,16 @@ async function initTVPage(){
     renderTVGenreScroller(genresMap);
     applyTVFilterSort();
 
-    // controls
-    $('#tv-apply')?.addEventListener('click', applyTVFilterSort);
-    $('#tv-clear')?.addEventListener('click', () => {
+    // controls – support both ID schemes
+    TVSEL.applyBtn()?.addEventListener('click', applyTVFilterSort);
+    TVSEL.clearBtn()?.addEventListener('click', () => {
       tvState.selectedGenres.clear();
-      $('#tv-sort-by').value = 'pop-desc';
+      const s = TVSEL.sort();
+      if (s) s.value = 'pop-desc';
       renderTVGenreScroller(genresMap);
       applyTVFilterSort();
     });
-    $('#tv-sort-by')?.addEventListener('change', applyTVFilterSort);
+    TVSEL.sort()?.addEventListener('change', applyTVFilterSort);
   } catch (e) {
     console.error('TV load error:', e);
     grid.innerHTML = `<p class="meta">Failed to load TV shows.</p>`;
