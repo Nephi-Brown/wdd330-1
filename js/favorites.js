@@ -1,7 +1,8 @@
 // js/favorites.js
-// Favorites page — render normal cards with genres + keep Details/Remove
+// Favorites page — render normal cards with genres + Details/Remove,
+// with skeletons while enriching saved items, and staggered reveal.
 
-import { loadHeaderFooter, updateFavCount } from './utils.mjs';
+import { loadHeaderFooter, updateFavCount, renderSkeletonCards, revealStaggered } from './utils.mjs';
 import { tmdb, normalizeMedia } from './api.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -53,7 +54,6 @@ async function enrichFavorite(fav) {
   // We saved a minimal snapshot in favorites; fetch full record to get genres
   const raw = await tmdb(`${fav.type}/${fav.id}`);
   const item = await normalizeMedia(raw, fav.type); // includes genres + typeLabel
-  // Keep original rating/year/poster if API is missing (rare)
   return {
     ...fav,
     ...item,
@@ -64,9 +64,11 @@ async function enrichFavorite(fav) {
 }
 
 async function renderFavorites() {
+  // Prefer existing #fav-grid (favorites.html) else create #favorites-grid
   const container =
-    $('#favorites-grid') || (function () {
-      // Create a container if the page doesn't have one
+    $('#fav-grid') ||
+    $('#favorites-grid') ||
+    (function () {
       const main = $('main') || document.body;
       const sec = document.createElement('section');
       sec.innerHTML = `<h2>Your Favorites</h2><div id="favorites-grid" class="ct-grid ct-grid--3"></div>`;
@@ -81,17 +83,21 @@ async function renderFavorites() {
     return;
   }
 
+  // Skeleton while enriching
+  const id = container.id || 'favorites-grid';
+  renderSkeletonCards(id, Math.min(favs.length, 8));
+
   // Enrich in parallel (genres/typeLabel)
   let items = [];
   try {
     items = await Promise.all(favs.map(enrichFavorite));
   } catch (e) {
     console.error('Failed to enrich favorites:', e);
-    // Fallback: render plain saved data
     items = favs.map(f => ({ ...f, typeLabel: f.type === 'movie' ? 'Movie' : 'TV', genres: [] }));
   }
 
   container.innerHTML = items.map(cardTemplate).join('');
+  revealStaggered(container); // animate favorites
 
   // Wire Remove buttons
   container.querySelectorAll('.btn-remove').forEach(btn => {

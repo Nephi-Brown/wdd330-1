@@ -145,15 +145,6 @@ header.ct-header {
   list-style: none;
 }
 
-/* === Active navigation link highlight === */
-nav a.active,
-.ct-nav a.active,
-#navwrap a.active {
-  color: var(--ct-gold);
-  font-weight: 700;
-  border-bottom: 2px solid var(--ct-gold);
-}
-
 
 /* Mobile nav open */
 .ct-navwrap.show { display: block; }
@@ -215,10 +206,11 @@ main {
   content: "";
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.25) 100%);
-  opacity: 0;
-  transition: opacity .3s ease;
+  background: rgba(0,0,0,0);
+  transition: background 0.3s ease;
+}
+.card:hover .card__media::after {
+  background: rgba(0,0,0,0.05);
 }
 
 .card:hover .card__img { transform: scale(1.06); }
@@ -599,4 +591,278 @@ footer.ct-footer {
 }
 #detail-meta strong{
   font-weight: 800;              /* bold labels */
+}
+
+/* === Active navigation highlight === */
+.ct-navwrap a.active {
+  color: var(--ct-gold);
+  font-weight: 700;
+  border-bottom: 2px solid var(--ct-gold);
+}
+
+/* === Details page: stack meta/credits lines vertically === */
+#detail-meta{
+  display: block;
+}
+#detail-meta .meta{
+  display: block;
+  margin: 0.25rem 0;
+}
+#detail-meta strong{
+  font-weight: 800;
+}
+
+/* === Skeleton / Shimmer === */
+@keyframes ct-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.skeleton-box,
+.skeleton-line,
+.skeleton-avatar {
+  position: relative;
+  overflow: hidden;
+  background: #e5e7eb;            /* light gray base */
+  border-radius: 10px;
+}
+.skeleton-line { height: 14px; margin: 8px 0; }
+.skeleton-avatar { width: 42px; height: 42px; border-radius: 999px; }
+.skeleton-box::after,
+.skeleton-line::after,
+.skeleton-avatar::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  animation: ct-shimmer 1.2s infinite;
+}
+
+/* Card-shaped skeleton */
+.card.skeleton { pointer-events: none; }
+.card.skeleton .card__media .skeleton-box {
+  aspect-ratio: 16 / 9;
+}
+.card.skeleton .card__body { padding: 16px; }
+
+/* Detail page skeleton blocks */
+.ct-detail .skeleton-title { height: 28px; width: 65%; border-radius: 8px; }
+.ct-detail .skeleton-meta { height: 14px; width: 40%; border-radius: 8px; margin: 8px 0; }
+
+/* === Collapsible Filter/Sort panel === */
+.ct-collapsible {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.ct-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+
+/* chips for checkboxes */
+.ct-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--ct-gray);
+  color: var(--ct-dark);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid rgba(0,0,0,.08);
+  font-weight: 600;
+}
+.ct-chip input { appearance: none; width: 14px; height: 14px; border-radius: 3px; border: 2px solid var(--ct-blue); display: inline-block; }
+.ct-chip input:checked { background: var(--ct-blue); }
+
+.ct-sortlabel { font-weight: 700; margin-right: 6px; }
+
+.ct-filter-group { display: inline-flex; align-items: center; gap: 10px; }
+
+.ct-filter-actions { margin-left: auto; display: inline-flex; gap: 10px; }
+
+/* Mobile: stack controls nicely */
+@media (max-width: 640px) {
+  .ct-filterbar { gap: 10px; }
+  .ct-filter-actions { margin-left: 0; width: 100%; display: flex; justify-content: flex-end; }
+}
+
+/* === Entrance animation for grid/carousel items === */
+@keyframes ct-reveal {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.reveal-item {
+  opacity: 0;
+  transform: translateY(8px) scale(.98);
+  will-change: transform, opacity;
+}
+.reveal-item.reveal-in {
+  animation: ct-reveal .48s cubic-bezier(.22,.61,.36,1) forwards;
+  animation-delay: calc(var(--stagger, 0) * 1ms);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-item, .reveal-item.reveal-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* === Collapsible Filter/Sort panel (already added; keep if present) === */
+.ct-collapsible {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  padding: 12px;
+  margin-top: 10px;
+}
+.ct-filterbar { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; }
+.ct-filter-group { display:inline-flex; align-items:center; gap:10px; }
+.ct-sortlabel { font-weight:700; margin-right:6px; }
+.ct-filter-actions { margin-left:auto; display:inline-flex; gap:10px; }
+
+/* === Genre scroller === */
+.genre-scroller {
+  display:block;
+  overflow-x:auto;
+  white-space:nowrap;
+  padding-bottom:6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.genre-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  margin-right:8px;
+  background:#f3f4f6;
+  color:#111827;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,.08);
+  font-weight:600;
+  cursor:pointer;
+  user-select:none;
+}
+.genre-chip[aria-pressed="true"] {
+  background: var(--ct-blue);
+  color:#fff;
+  border-color: var(--ct-blue);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .ct-filter-actions { margin-left:0; width:100%; display:flex; justify-content:flex-end; }
+}
+
+/* ============================================
+   Unified Card Hover (matches Browse by Category)
+   ============================================ */
+.card {
+  position: relative;
+  display: block;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card__media {
+  overflow: hidden;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.card__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.card__body {
+  padding: 0.75rem 1rem 1rem;
+  background: #fff;
+}
+
+/* Hover effect (same as Browse by Category) */
+.card:hover,
+.card:focus-within {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+}
+
+.card:hover .card__img,
+.card:focus-within .card__img {
+  transform: scale(1.05);
+}
+
+.card h3 {
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.card .meta {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+/* Optional: smooth transition for the entire grid */
+.ct-grid .card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* === Card Flip Navigation (robust) === */
+.ct-flip-clone {
+  position: fixed;
+  z-index: 9999;
+  margin: 0;
+  pointer-events: none;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+
+  transform-origin: center center;
+  transform: translateZ(0);
+  will-change: transform, opacity, filter;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  -webkit-transform-style: preserve-3d;
+  -webkit-backface-visibility: hidden;
+}
+.ct-flip-clone .card__img { transition: none !important; transform: none !important; }
+
+.ct-flip-animate {
+  animation: ct-flip-zoom 0.38s cubic-bezier(.22,.61,.36,1) forwards;
+  -webkit-animation: ct-flip-zoom 0.38s cubic-bezier(.22,.61,.36,1) forwards;
+}
+
+@keyframes ct-flip-zoom {
+  0%   { opacity: 1;   transform: translateZ(0) scale(1)   rotateY(0deg);    filter: none; }
+  60%  {               transform: translateZ(0) scale(1.06) rotateY(6deg);  }
+  100% { opacity: .12; transform: translateZ(0) scale(1.2)  rotateY(12deg); filter: blur(1px); }
+}
+@-webkit-keyframes ct-flip-zoom {
+  0%   { opacity: 1;   -webkit-transform: translateZ(0) scale(1)   rotateY(0deg);    filter: none; }
+  60%  {               -webkit-transform: translateZ(0) scale(1.06) rotateY(6deg);  }
+  100% { opacity: .12; -webkit-transform: translateZ(0) scale(1.2)  rotateY(12deg); filter: blur(1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-flip-animate { animation: none !important; -webkit-animation: none !important; }
 }

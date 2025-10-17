@@ -14,10 +14,44 @@
 </head>
 <body>
   <div id="main-head"></div>
+
   <main>
-    <h2>Popular Movies</h2>
-    <div id="movies-grid" class="ct-grid ct-grid--3"></div>
+    <section>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;">
+        <h2 style="margin:0;">Movies</h2>
+        <button id="filter-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="filter-panel" type="button">
+          Filters & Sort
+        </button>
+      </div>
+
+      <div id="filter-panel" class="ct-collapsible" hidden>
+        <form id="filter-form" class="ct-filterbar" aria-label="Filters and sorting for Movies">
+          <fieldset class="ct-filter-group" aria-label="Sort by">
+            <label class="ct-sortlabel" for="sort-by">Sort:</label>
+            <select id="sort-by">
+              <option value="pop-desc">Popularity (desc)</option>
+              <option value="rating-desc">Rating (desc)</option>
+              <option value="year-desc">Year (new → old)</option>
+              <option value="year-asc">Year (old → new)</option>
+              <option value="title-asc">Title (A–Z)</option>
+              <option value="title-desc">Title (Z–A)</option>
+            </select>
+          </fieldset>
+
+          <!-- Full movie genres -->
+          <div class="genre-scroller" id="genre-scroller" aria-label="Filter by genre"></div>
+
+          <div class="ct-filter-actions">
+            <button id="apply-filters" class="btn btn--primary" type="button">Apply</button>
+            <button id="clear-filters" class="btn btn--ghost" type="button">Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="movies-grid" class="ct-grid ct-grid--3" style="margin-top:12px;"></div>
+    </section>
   </main>
+
   <div id="main-foot"></div>
 </body>
 </html>
