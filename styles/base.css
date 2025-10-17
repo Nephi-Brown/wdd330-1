@@ -145,6 +145,16 @@ header.ct-header {
   list-style: none;
 }
 
+/* === Active navigation link highlight === */
+nav a.active,
+.ct-nav a.active,
+#navwrap a.active {
+  color: var(--ct-gold);
+  font-weight: 700;
+  border-bottom: 2px solid var(--ct-gold);
+}
+
+
 /* Mobile nav open */
 .ct-navwrap.show { display: block; }
 
@@ -577,4 +587,16 @@ footer.ct-footer {
     width: 26px;
     height: 26px;
   }
+}
+
+/* === Details page: stack meta/credits lines vertically === */
+#detail-meta{
+  display: block;                /* override global flex */
+}
+#detail-meta .meta{
+  display: block;                /* one line per item */
+  margin: 0.25rem 0;             /* gentle spacing */
+}
+#detail-meta strong{
+  font-weight: 800;              /* bold labels */
 }

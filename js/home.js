@@ -55,9 +55,11 @@ function initSearch(){
     e.preventDefault();
     const q = input?.value?.trim();
     if (!q) return;
-    window.location.href = `movies.html?q=${encodeURIComponent(q)}`;
+    // ⬇️ point to the search_results page
+    window.location.href = `search_results/index.html?q=${encodeURIComponent(q)}`;
   });
 }
+
 
 (async function(){
   await loadHeaderFooter();

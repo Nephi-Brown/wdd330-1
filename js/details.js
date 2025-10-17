@@ -1,11 +1,9 @@
 // js/details.js
-// Details page: Rating Name / Media Type / Genre / Description / Buttons
-// + Favorites toggle + Share fallback + Similar grid
+// Details page: formatted metadata, favorites, share, and similar section
 
 import { loadHeaderFooter, updateFavCount } from './utils.mjs';
 import { tmdb, normalizeMedia, toMediaList } from './api.js';
 
-/* ----------------- tiny helpers ----------------- */
 const $ = (s, r = document) => r.querySelector(s);
 const getParam = (k) => new URLSearchParams(location.search).get(k);
 
@@ -16,15 +14,14 @@ function ensureEl(tag, attrs = {}, parent) {
   return el;
 }
 
-/* ----------------- favorites helpers ----------------- */
+/* ---------- Favorites Helpers ---------- */
 function getFavs() {
   try { return JSON.parse(localStorage.getItem('ct-favorites') || '[]'); }
   catch { return []; }
 }
 function setFavs(list) {
   localStorage.setItem('ct-favorites', JSON.stringify(list));
-  // update badge in header if present
-  try { updateFavCount?.(); } catch {}
+  updateFavCount?.();
 }
 function isInFavs(list, id, type) {
   return list.some(f => f.id === id && f.type === type);
@@ -34,26 +31,23 @@ function toggleFavorite(item, btn) {
   if (isInFavs(favs, item.id, item.type)) {
     const next = favs.filter(f => !(f.id === item.id && f.type === item.type));
     setFavs(next);
-    if (btn) btn.textContent = 'Add to Favorites';
+    btn.textContent = 'Add to Favorites';
   } else {
-    const entry = {
-      id: item.id,
-      type: item.type,
-      title: item.title,
-      poster: item.poster,
-      year: item.year,
-      rating: item.rating
-    };
-    setFavs([entry, ...favs]);
-    if (btn) btn.textContent = 'Remove from Favorites';
+    favs.unshift({
+      id: item.id, type: item.type,
+      title: item.title, poster: item.poster,
+      year: item.year, rating: item.rating
+    });
+    setFavs(favs);
+    btn.textContent = 'Remove from Favorites';
   }
 }
 
-/* ----------------- share helper ----------------- */
+/* ---------- Share Helper ---------- */
 async function shareOrCopy(title) {
   const url = location.href;
   if (navigator.share) {
-    try { await navigator.share({ title, url }); return; } catch { /* user canceled or not available */ }
+    try { await navigator.share({ title, url }); return; } catch {}
   }
   try {
     await navigator.clipboard?.writeText(url);
@@ -74,28 +68,30 @@ function toast(msg) {
   setTimeout(() => el.remove(), 1400);
 }
 
-/* ----------------- layout helpers ----------------- */
+/* ---------- Layout Builders ---------- */
 function getOrCreateInfoPanel() {
-  // Prefer an existing right-side container, otherwise create one.
   let info = $('#detail-info') || $('.ct-detail__main');
   if (!info) {
-    // If no grid exists, create a minimal grid with poster + info
     const main = $('main') || document.body;
     const wrap = ensureEl('section', { class: 'ct-detail' }, main);
-    const poster = ensureEl('div', { id: 'detail-poster', class: 'ct-detail__poster' }, wrap);
-    poster.innerHTML = `<div class="wf wf--block">Poster</div>`;
+    ensureEl('div', { id: 'detail-poster', class: 'ct-detail__poster' }, wrap)
+      .innerHTML = `<div class="wf wf--block">Poster</div>`;
     info = ensureEl('article', { id: 'detail-info', class: 'ct-detail__main' }, wrap);
   }
 
-  // Rebuild the info contents in the exact order requested
   info.innerHTML = `
     <div class="detail-head" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span id="detail-rating"></span>
       <h1 id="detail-title" style="margin:0;">Title</h1>
     </div>
 
-    <p id="detail-type" class="meta" style="margin:.5rem 0 0;">Media Type: </p>
-    <p id="detail-genres" class="meta" style="margin:.25rem 0 1rem;">Genre: </p>
+    <div id="detail-meta" class="ct-detail__meta" style="margin:.75rem 0;">
+      <p id="detail-type" class="meta"></p>
+      <p id="detail-genres" class="meta"></p>
+      <p id="credit-director" class="meta"></p>
+      <p id="credit-producer" class="meta"></p>
+      <p id="credit-stars" class="meta"></p>
+    </div>
 
     <h3 style="margin:.25rem 0 .25rem;">Description</h3>
     <p id="detail-overview" class="meta"></p>
@@ -105,39 +101,49 @@ function getOrCreateInfoPanel() {
       <button class="btn btn--ghost" id="share-btn" type="button">Share</button>
     </div>
   `;
-
   return info;
 }
+
 function getPosterContainer() {
   return $('#detail-poster') || $('.ct-detail__poster');
 }
 
-/* ----------------- renderers ----------------- */
+/* ---------- Renderer ---------- */
 function renderDetails(item, raw) {
-  // Ensure we have a stable info panel
   const info = getOrCreateInfoPanel();
 
-  // Rating + Name
-  const titleEl = $('#detail-title', info);
-  if (titleEl) titleEl.textContent = item.title;
+  // Title + Rating
+  $('#detail-title', info).textContent = item.title;
+  $('#detail-rating', info).innerHTML = item.rating ? `<span class="badge">★ ${item.rating}</span>` : '';
 
-  const ratingEl = $('#detail-rating', info);
-  if (ratingEl) {
-    ratingEl.innerHTML = item.rating ? `<span class="badge">★ ${item.rating}</span>` : '';
-  }
-
-  // Media Type (bold, slightly larger handled in CSS you added)
+  // Media and Genre formatted same as credits
   const typeEl = $('#detail-type', info);
-  if (typeEl) typeEl.textContent = `Media: ${item.typeLabel}`;
-
-  // Genres
   const genresEl = $('#detail-genres', info);
-  const genresText = item.genres?.length ? item.genres.join(', ') : '—';
-  if (genresEl) genresEl.textContent = `Genre: ${genresText}`;
+  const genreText = item.genres?.length ? item.genres.join(', ') : '—';
+  typeEl.innerHTML = `<strong>Media:</strong> ${item.typeLabel}`;
+  genresEl.innerHTML = `<strong>Genre:</strong> ${genreText}`;
+
+  // Credits lines
+  const crew = raw.credits?.crew || [];
+  const cast = raw.credits?.cast || [];
+  const directors = crew.filter(p => p.job === 'Director').map(p => p.name);
+  const producers = crew.filter(p => p.job === 'Producer').map(p => p.name);
+  const leads = cast.slice(0, 3).map(a => a.name);
+
+  const dirEl = $('#credit-director', info);
+  const prodEl = $('#credit-producer', info);
+  const starsEl = $('#credit-stars', info);
+
+  dirEl.innerHTML = directors.length ? `<strong>Director:</strong> ${directors.join(', ')}` : '';
+  prodEl.innerHTML = producers.length ? `<strong>Producer:</strong> ${producers.join(', ')}` : '';
+  starsEl.innerHTML = leads.length ? `<strong>Stars:</strong> ${leads.join(', ')}` : '';
+
+  [typeEl, genresEl, dirEl, prodEl, starsEl].forEach(el => {
+    if (el && !el.textContent.trim()) el.style.display = 'none';
+  });
 
   // Description
-  const overviewEl = $('#detail-overview', info);
-  if (overviewEl) overviewEl.textContent = raw.overview || '—';
+  $('#detail-overview', info).textContent = raw.overview || '—';
 
   // Poster
   const posterWrap = getPosterContainer();
@@ -147,17 +153,13 @@ function renderDetails(item, raw) {
       : `<div class="wf wf--block">No Poster</div>`;
   }
 
-  // Wire buttons
+  // Buttons
   const favBtn = $('#fav-btn', info);
-  if (favBtn) {
-    const inList = isInFavs(getFavs(), item.id, item.type);
-    favBtn.textContent = inList ? 'Remove from Favorites' : 'Add to Favorites';
-    favBtn.addEventListener('click', () => toggleFavorite(item, favBtn));
-  }
-  const shareBtn = $('#share-btn', info);
-  if (shareBtn) {
-    shareBtn.addEventListener('click', async () => { await shareOrCopy(item.title); });
-  }
+  const inFavs = isInFavs(getFavs(), item.id, item.type);
+  favBtn.textContent = inFavs ? 'Remove from Favorites' : 'Add to Favorites';
+  favBtn.addEventListener('click', () => toggleFavorite(item, favBtn));
+
+  $('#share-btn', info)?.addEventListener('click', () => shareOrCopy(item.title));
 }
 
 function mediaCard(i) {
@@ -187,12 +189,12 @@ function renderSimilar(list) {
   grid.innerHTML = list?.length ? list.map(mediaCard).join('') : `<p class="meta">No similar titles found.</p>`;
 }
 
-/* ----------------- bootstrap ----------------- */
+/* ---------- Init ---------- */
 (async function init() {
   await loadHeaderFooter();
 
   const id = getParam('id');
-  const type = getParam('type'); // 'movie' | 'tv'
+  const type = getParam('type');
   if (!id || !type) {
     const main = $('main') || document.body;
     main.insertAdjacentHTML('afterbegin', `<div class="alert"><h2>Missing item id or type.</h2></div>`);
@@ -200,12 +202,10 @@ function renderSimilar(list) {
   }
 
   try {
-    // primary item
-    const raw = await tmdb(`${type}/${id}`);
+    const raw = await tmdb(`${type}/${id}`, { append_to_response: 'credits' });
     const item = await normalizeMedia(raw, type);
     renderDetails(item, raw);
 
-    // similar
     const sim = await tmdb(`${type}/${id}/similar`, { page: 1 });
     const similarItems = await toMediaList((sim.results || []).slice(0, 12), type);
     renderSimilar(similarItems);

@@ -1,187 +1,220 @@
-// ===== utils.mjs (Fix B: dynamic favorites badge) =====
+// js/utils.mjs
+// CineTrack Utilities
+// Handles header/footer injection, responsive nav, active link highlighting,
+// favorites badge, and global search behavior.
 
-// qs: querySelector wrapper
-export function qs(selector, parent = document) {
-  return parent.querySelector(selector);
-}
+/* --------------------------------------
+   General helpers
+--------------------------------------- */
+export const qs  = (sel, root = document) => root.querySelector(sel);
+export const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-// LocalStorage helpers
-export function getLocalStorage(key) {
+/* --------------------------------------
+   LocalStorage helpers
+--------------------------------------- */
+export function getLocalStorage(key, fallback = null) {
   try {
-    const data = JSON.parse(localStorage.getItem(key));
-    return key === 'so-cart' ? (Array.isArray(data) ? data : []) : data;
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v;
   } catch {
-    return key === 'so-cart' ? [] : null;
+    return fallback;
   }
 }
-export function setLocalStorage(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-  // Update favorites badge immediately when favorites change
-  if (key === 'ct-favorites') updateFavCount();
+
+export function setLocalStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
 }
 
-// Click helper
-export function setClick(selector, callback) {
-  const el = qs(selector);
-  if (!el) return;
-  el.addEventListener('touchend', (event) => { event.preventDefault(); callback(); });
-  el.addEventListener('click', callback);
-}
-
-// URL param
-export function getParam(param) {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get(param);
-}
-
-// Render helpers
-export function renderListWithTemplate(templateFn, parentElement, list, position = 'afterbegin', clear = false) {
-  const parent = typeof parentElement === 'string' ? document.querySelector(parentElement) : parentElement;
-  if (!parent) return;
-  if (clear) parent.innerHTML = '';
-  if (!Array.isArray(list) || list.length === 0) {
-    parent.insertAdjacentHTML(position, '<p>No results found.</p>');
-    return;
-  }
-  const htmlStrings = list.map(templateFn);
-  parent.insertAdjacentHTML(position, htmlStrings.join(''));
-}
-
-export function renderWithTemplate(templateFn, parentElement, callback) {
-  parentElement.innerHTML = templateFn;
-  if (callback) callback();
-}
-
-export async function loadTemplate(path) {
-  const res = await fetch(path);
-  return await res.text();
-}
-
-/* === Header/Footer loader with robust paths === */
-async function tryFetch(paths) {
-  for (const p of paths) {
-    try {
-      const res = await fetch(p);
-      if (res.ok) return await res.text();
-    } catch(_) {}
-  }
-  return null;
-}
-
-export async function loadHeaderFooter() {
-  // Ensure mount points exist
-  if (!document.querySelector('#main-head')) {
-    const headDiv = document.createElement('div'); headDiv.id = 'main-head';
-    document.body.prepend(headDiv);
-  }
-  if (!document.querySelector('#main-foot')) {
-    const footDiv = document.createElement('div'); footDiv.id = 'main-foot';
-    document.body.append(footDiv);
-  }
-
-  // HEADER
-  const headerHTML = await tryFetch([
-    'public/partials/header.html',
-  ]);
-  if (headerHTML) {
-    document.querySelector('#main-head').outerHTML = `<div id="main-head">${headerHTML}</div>`;
-  }
-
-  // FOOTER
-  const footerHTML = await tryFetch([
-    'public/partials/footer.html',
-  ]);
-  if (footerHTML) {
-    document.querySelector('#main-foot').outerHTML = `<div id="main-foot">${footerHTML}</div>`;
-  }
-
-  // Footer current year
-  const currentYearElement = document.getElementById('currentyear');
-  if (currentYearElement) currentYearElement.textContent = new Date().getFullYear();
-
-  // Init mobile nav toggle
-  const mainnavWrap = document.getElementById('navwrap');
-  const hamButton = document.getElementById('menu');
-  if (hamButton && mainnavWrap) {
-    hamButton.setAttribute('aria-expanded', 'false');
-    hamButton.addEventListener('click', () => {
-      const isOpen = mainnavWrap.classList.toggle('show');
-      hamButton.classList.toggle('show', isOpen);
-      hamButton.setAttribute('aria-expanded', String(isOpen));
-    });
-    const DESKTOP_BP = 760;
-    const resetForDesktop = () => {
-      if (window.innerWidth >= DESKTOP_BP) {
-        mainnavWrap.classList.add('show');
-        hamButton.classList.remove('show');
-        hamButton.setAttribute('aria-expanded', 'true');
-      } else {
-        mainnavWrap.classList.remove('show');
-        hamButton.setAttribute('aria-expanded', 'false');
-      }
-    };
-    resetForDesktop();
-    window.addEventListener('resize', resetForDesktop);
-  }
-
-  // ✅ Update favorites badge now that header exists
-  updateFavCount();
-}
-
-// ===== Favorites badge updater (Fix B) =====
+/* --------------------------------------
+   Favorites badge logic
+--------------------------------------- */
 export function updateFavCount() {
+  const badge = document.getElementById('fav-count');
+  if (!badge) return;
+
   let count = 0;
   try {
     const favs = JSON.parse(localStorage.getItem('ct-favorites') || '[]');
     count = Array.isArray(favs) ? favs.length : 0;
-  } catch { count = 0; }
+  } catch {
+    count = 0;
+  }
 
-  const badge = document.getElementById('fav-count');
-  if (!badge) return;
-
-  if (count > 0) {
-    badge.textContent = String(count);
-  } else {
-    // Empty string hides the badge via CSS :empty
+  if (count <= 0) {
     badge.textContent = '';
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = 'grid';
+    badge.textContent = count > 99 ? '99+' : String(count);
   }
 }
 
-// Keep multiple tabs in sync
-window.addEventListener('storage', (e) => {
-  if (e.key === 'ct-favorites') updateFavCount();
-});
+/* --------------------------------------
+   Mobile nav (hamburger menu)
+--------------------------------------- */
+function initMobileNav() {
+  const btn = document.getElementById('menu');
+  const navwrap = document.getElementById('navwrap');
+  if (!btn || !navwrap) return;
 
-// Legacy cart helpers (safe no-ops if not present)
-export function updateCartBadge() {
-  const cart = getLocalStorage('so-cart') || [];
-  const badge = document.querySelector('.cart-count');
-  if (!badge) return;
-  const totalCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  badge.textContent = totalCount;
-  if (totalCount > 0) badge.classList.remove('hide'); else badge.classList.add('hide');
-}
-export function bounceCartIcon() {
-  const cartIcon = document.querySelector('.cart');
-  if (!cartIcon) return;
-  cartIcon.classList.remove('cart-bounce');
-  void cartIcon.offsetWidth;
-  cartIcon.classList.add('cart-bounce');
-}
+  if (btn.dataset.bound === '1') return; // avoid rebinding
+  btn.dataset.bound = '1';
 
-// Alerts
-export function alertMessage(message, scroll = true) {
-  const alert = document.createElement('div');
-  const main = document.querySelector('main');
-  alert.classList.add('alert');
-  alert.innerHTML = `<h2>${message}</h2><button id='alert-close'>&times;</button>`;
-  alert.addEventListener('click', function(e) {
-    if(e.target.id === 'alert-close') { main.removeChild(this); }
+  btn.setAttribute('aria-expanded', 'false');
+
+  btn.addEventListener('click', () => {
+    const open = !navwrap.classList.contains('show');
+    navwrap.classList.toggle('show', open);
+    btn.classList.toggle('show', open);
+    btn.setAttribute('aria-expanded', String(open));
   });
-  main.prepend(alert);
-  if(scroll) window.scrollTo(0,0);
+
+  const DESKTOP_BP = 760;
+  const resetForDesktop = () => {
+    if (window.innerWidth >= DESKTOP_BP) {
+      navwrap.classList.remove('show');
+      btn.classList.remove('show');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  };
+  resetForDesktop();
+  window.addEventListener('resize', resetForDesktop);
 }
-export function removeAllAlerts() {
-  const alerts = document.querySelectorAll('.alert');
-  alerts.forEach((alert) => document.querySelector('main').removeChild(alert));
+
+/* --------------------------------------
+   Normalize header paths for nested pages
+   (so links & images work inside /search_results/)
+--------------------------------------- */
+function normalizeHeaderPaths(headerRoot) {
+  if (!headerRoot) return;
+
+  const isNested = location.pathname.includes('/search_results/');
+  const prefix = isNested ? '../' : '';
+
+  // Fix <a> links
+  qsa('a[href]', headerRoot).forEach(a => {
+    const href = a.getAttribute('href');
+    if (!href) return;
+    if (/^(https?:|mailto:|#|\/)/i.test(href)) return; // ignore absolute, anchors, or root paths
+    if (isNested && href.startsWith('../')) return;     // already prefixed
+    a.setAttribute('href', prefix + href);
+  });
+
+  // Fix <img> sources
+  qsa('img[src]', headerRoot).forEach(img => {
+    const src = img.getAttribute('src');
+    if (!src) return;
+    if (/^(https?:|data:|\/)/i.test(src)) return;       // ignore absolute or root paths
+    if (isNested && src.startsWith('../')) return;
+    img.setAttribute('src', prefix + src);
+  });
+}
+
+/* --------------------------------------
+   Global header search (works on all pages)
+--------------------------------------- */
+function initGlobalSearch() {
+  const form = document.querySelector('.ct-search');
+  const input = document.getElementById('global-search');
+  if (!form || !input) return;
+  if (form.dataset.bound === '1') return;
+  form.dataset.bound = '1';
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+
+    const isNested = location.pathname.includes('/search_results/');
+    const target = isNested
+      ? `index.html?q=${encodeURIComponent(q)}`
+      : `search_results/index.html?q=${encodeURIComponent(q)}`;
+    window.location.href = target;
+  });
+}
+
+/* --------------------------------------
+   Highlight active navigation link
+--------------------------------------- */
+function highlightActiveNav() {
+  const nav = document.getElementById('navwrap');
+  if (!nav) return;
+
+  const links = nav.querySelectorAll('a[href]');
+  const current = location.pathname.split('/').pop().toLowerCase();
+  const isNested = location.pathname.includes('/search_results/');
+
+  links.forEach(link => {
+    const href = link.getAttribute('href') || '';
+    const filename = href.split('/').pop().toLowerCase();
+
+    link.classList.remove('active');
+
+    // Don’t highlight anything on search results pages
+    if (isNested && current.includes('index.html')) return;
+
+    if (current === filename) {
+      link.classList.add('active');
+    } else if ((current === '' || current === '/') && filename === 'index.html') {
+      link.classList.add('active');
+    }
+  });
+}
+
+/* --------------------------------------
+   Header / Footer injection
+--------------------------------------- */
+async function fetchFirst(paths) {
+  for (const p of paths) {
+    try {
+      const res = await fetch(p, { cache: 'no-cache' });
+      if (res.ok) return await res.text();
+    } catch {}
+  }
+  return '';
+}
+
+export async function loadHeaderFooter() {
+  // Works from both root and nested pages
+  const headerHTML = await fetchFirst([
+    'public/partials/header.html',
+    '../public/partials/header.html',
+    'header.html',
+    '../header.html'
+  ]);
+  const footerHTML = await fetchFirst([
+    'public/partials/footer.html',
+    '../public/partials/footer.html',
+    'footer.html',
+    '../footer.html'
+  ]);
+
+  const headMount = document.getElementById('main-head');
+  const footMount = document.getElementById('main-foot');
+
+  if (headMount) headMount.innerHTML = headerHTML || '';
+  if (footMount) footMount.innerHTML = footerHTML || '';
+
+  // Fix relative paths if inside nested folders
+  if (headMount) normalizeHeaderPaths(headMount);
+
+  // Initialize interactive elements
+  initMobileNav();
+  initGlobalSearch();
+  updateFavCount();
+  highlightActiveNav();
+}
+
+/* --------------------------------------
+   Optional: manual re-init if header/footer swapped dynamically
+--------------------------------------- */
+export function reinitHeaderUI() {
+  const headMount = document.getElementById('main-head');
+  if (headMount) normalizeHeaderPaths(headMount);
+  initMobileNav();
+  initGlobalSearch();
+  updateFavCount();
+  highlightActiveNav();
 }
