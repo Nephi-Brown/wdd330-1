@@ -1,8 +1,7 @@
 // js/home.js
-// One script for Home, Movies page, and TV page
-// - Home: Trending / Movies / TV sections (no pagination)
-// - Movies page: Filters, Genre scroller, Pagination (15 per page)
-// - TV page:     Filters, Genre scroller, Pagination (15 per page)
+// - Home sections (no pagination)
+// - Movies & TV pages: unlimited paging (15/page), filters w/ AND/OR genre toggle,
+//   glassy filterbar compatible, robust scroll-to-top, re-prime + triple reveal.
 
 import {
   loadHeaderFooter,
@@ -15,7 +14,80 @@ import { tmdb, toMediaList } from './api.js';
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-/* ---------------- Shared card template ---------------- */
+/* --------------------------------------
+   Scroll — robust, header-aware, cross-browser
+--------------------------------------- */
+function getHeaderOffset() {
+  const header = document.querySelector('header, #main-head');
+  if (!header) return 0;
+  const cs = getComputedStyle(header);
+  const fixedLike = cs.position === 'fixed' || cs.position === 'sticky';
+  return fixedLike ? header.offsetHeight : 0;
+}
+function smartScrollTop() {
+  const targetY = Math.max(0, 0 - getHeaderOffset() - 6);
+  try { window.scrollTo({ top: targetY, behavior: 'smooth' }); }
+  catch { window.scrollTo(0, targetY); }
+  requestAnimationFrame(() => {
+    try { window.scrollTo({ top: targetY, behavior: 'smooth' }); }
+    catch { window.scrollTo(0, targetY); }
+  });
+  setTimeout(() => { window.scrollTo(0, targetY); }, 380);
+}
+
+/* --------------------------------------
+   Reveal re-prime helpers (safe)
+--------------------------------------- */
+function primeCards(scope) {
+  const grid = typeof scope === 'string' ? document.getElementById(scope) : scope;
+  if (!grid) return;
+  $$('.card', grid).forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(8px) scale(0.98)';
+    card.classList.remove('is-visible', 'reveal-in', 'io-seen');
+  });
+}
+function triggerReveals(scope) {
+  const grid = typeof scope === 'string' ? document.getElementById(scope) : scope;
+  if (!grid) return;
+  try { revealStaggered(grid); } catch {}
+  requestAnimationFrame(() => { try { revealStaggered(grid); } catch {} });
+  setTimeout(() => { try { revealStaggered(grid); } catch {} }, 380);
+}
+
+/* --------------------------------------
+   AND/OR fieldset injection (ensures it exists)
+--------------------------------------- */
+function injectModeFieldset({ prefix, form, beforeEl }) {
+  const andId = `${prefix}-mode-and`;
+  if (document.getElementById(andId)) return; // already present
+
+  const fs = document.createElement('fieldset');
+  fs.className = 'ct-filter-group';
+  fs.setAttribute('aria-label', 'Genre matching mode');
+  fs.innerHTML = `
+    <label class="ct-sortlabel">Match:</label>
+    <div class="ct-segment ct-segment--pill">
+      <input type="radio" id="${prefix}-mode-and" name="${prefix}-genre-mode" value="AND" checked>
+      <label for="${prefix}-mode-and" class="btn btn--ghost ct-pill">All (AND)</label>
+      <input type="radio" id="${prefix}-mode-or" name="${prefix}-genre-mode" value="OR">
+      <label for="${prefix}-mode-or" class="btn btn--ghost ct-pill">Any (OR)</label>
+    </div>
+  `;
+  if (beforeEl?.parentElement) {
+    beforeEl.parentElement.insertBefore(fs, beforeEl);
+  } else {
+    form.appendChild(fs);
+  }
+}
+function wireModeChange(prefix, onChange) {
+  document.getElementById(`${prefix}-mode-and`)?.addEventListener('change', onChange);
+  document.getElementById(`${prefix}-mode-or`)?.addEventListener('change', onChange);
+}
+
+/* --------------------------------------
+   Shared card template + pager mount
+--------------------------------------- */
 function mediaCard(item){
   const genreText = item.genres && item.genres.length ? ` (${item.genres.join(', ')})` : '';
   const metaLine = `${item.year || '—'} — ${item.typeLabel}${genreText}`;
@@ -33,8 +105,22 @@ function mediaCard(item){
   </a>`;
 }
 
+function ensurePagerMount(pagerId, gridId) {
+  let mount = document.getElementById(pagerId);
+  if (!mount) {
+    const grid = document.getElementById(gridId);
+    const section = grid?.parentElement || document.querySelector('main') || document.body;
+    mount = document.createElement('div');
+    mount.id = pagerId;
+    mount.className = 'ct-pagination';
+    mount.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.5rem 1rem;margin-top:1rem;';
+    section.appendChild(mount);
+  }
+  return mount;
+}
+
 /* =======================================================
-   HOME PAGE (index.html) – simple sections (no pagination)
+   HOME PAGE (index.html) – simple sections
 ======================================================= */
 async function loadTrendingHome(){
   const id = 'trending-grid';
@@ -47,12 +133,11 @@ async function loadTrendingHome(){
   const list = await toMediaList(raw);
   const el = document.getElementById(id);
   el.innerHTML = list.map(mediaCard).join('');
-  revealStaggered(el);
+  primeCards(el);
+  triggerReveals(el);
 }
-
 async function loadMoviesHome(){
   const id = 'movies-grid';
-  // Only run this "home" loader if we're on index.html (avoid clashing with full Movies page)
   if (!document.getElementById(id) || !location.pathname.toLowerCase().endsWith('index.html')) return;
   renderSkeletonCards(id, 6);
   const data = await tmdb('movie/popular', { page: 1 });
@@ -60,9 +145,9 @@ async function loadMoviesHome(){
   const list = await toMediaList(raw, 'movie');
   const el = document.getElementById(id);
   el.innerHTML = list.map(mediaCard).join('');
-  revealStaggered(el);
+  primeCards(el);
+  triggerReveals(el);
 }
-
 async function loadTVHome(){
   const id = 'tv-grid';
   if (!document.getElementById(id) || !location.pathname.toLowerCase().endsWith('index.html')) return;
@@ -72,22 +157,96 @@ async function loadTVHome(){
   const list = await toMediaList(raw, 'tv');
   const el = document.getElementById(id);
   el.innerHTML = list.map(mediaCard).join('');
-  revealStaggered(el);
+  primeCards(el);
+  triggerReveals(el);
 }
 
 /* =======================================================
-   MOVIES PAGE – filters + genres + pagination (15/page)
+   Unlimited-paging core (Movies & TV)
 ======================================================= */
-const moviesState = {
-  source: [],
-  view:   [],
-  currentPage: 1,
-  pageSize: 15,
-  selectedGenres: new Set()
+function makeInfiniteState(media) {
+  return {
+    media,               // 'movie' | 'tv'
+    buffer: [],          // normalized items fetched so far
+    view: [],            // filtered/sorted view of buffer
+    page: 1,
+    pageSize: 15,
+    selectedGenres: new Set(),
+    genreMode: 'AND',    // 'AND' | 'OR'
+    sort: 'pop-desc',
+    nextApiPage: 1,      // next TMDB page to fetch (their pages are 20 items)
+    apiExhausted: false
+  };
+}
+
+/* Fetch more results into buffer */
+async function fetchMore(state) {
+  if (state.apiExhausted) return false;
+  const endpoint = state.media === 'tv' ? 'tv/popular' : 'movie/popular';
+  const apiPage = state.nextApiPage;
+  const res = await tmdb(endpoint, { page: apiPage });
+  const results = res?.results || [];
+  if (!results.length) { state.apiExhausted = true; return false; }
+  const normalized = await toMediaList(results, state.media);
+  state.buffer.push(...normalized);
+  state.nextApiPage += 1;
+  return true;
+}
+
+/* AND/OR genre matcher */
+function matchesGenres(itemGenres, selected, mode) {
+  if (!selected.length) return true;
+  const g = Array.isArray(itemGenres) ? itemGenres : [];
+  if (!g.length) return false;
+  const gLower = g.map(x => String(x).toLowerCase().trim());
+  const selLower = selected.map(s => String(s).toLowerCase().trim());
+  return mode === 'AND'
+    ? selLower.every(s => gLower.includes(s))
+    : selLower.some(s => gLower.includes(s));
+}
+
+/* Build view with current filters/sort */
+function buildView(state) {
+  const selected = Array.from(state.selectedGenres || []);
+  let list = state.buffer.filter(i => matchesGenres(i.genres, selected, state.genreMode));
+
+  const byTitle = (a,b)=>a.title.localeCompare(b.title,undefined,{sensitivity:'base'});
+  const byYear  = (a,b)=>(parseInt(b.year||0)-parseInt(a.year||0));
+  const byRate  = (a,b)=>(parseFloat(b.rating||0)-parseFloat(a.rating||0));
+  switch (state.sort) {
+    case 'rating-desc': list.sort(byRate); break;
+    case 'year-desc':   list.sort(byYear); break;
+    case 'year-asc':    list.sort((a,b)=>-byYear(a,b)); break;
+    case 'title-asc':   list.sort(byTitle); break;
+    case 'title-desc':  list.sort((a,b)=>-byTitle(a,b)); break;
+    default: break; // keep API popularity order
+  }
+  state.view = list;
+}
+
+/* Ensure enough items for a given page (fetch as needed) */
+async function ensureViewForPage(state, targetPage) {
+  const needed = targetPage * state.pageSize;
+  while (state.view.length < needed && !state.apiExhausted) {
+    const got = await fetchMore(state);
+    if (!got) break;
+    buildView(state);
+  }
+}
+
+/* =======================================================
+   Movies page
+======================================================= */
+const movies = makeInfiniteState('movie');
+
+const MSEL = {
+  sort:     () => $('#movies-sort-by') || $('#sort-by'),
+  scroller: () => $('#movies-genre-scroller') || $('#genre-scroller'),
+  apply:    () => $('#movies-apply') || $('#apply-filters'),
+  clear:    () => $('#movies-clear') || $('#clear-filters'),
 };
 
 function ensureMoviesUI() {
-  // If #movies-grid exists we assume page has markup; otherwise build it
   let grid = $('#movies-grid');
   if (!grid) {
     const main = $('main') || document.body;
@@ -98,8 +257,8 @@ function ensureMoviesUI() {
         <button id="filter-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="filter-panel" type="button">Filters & Sort</button>
       </div>
       <div id="filter-panel" class="ct-collapsible" hidden>
-        <form id="filter-form" class="ct-filterbar">
-          <fieldset class="ct-filter-group">
+        <form id="filter-form" class="ct-filterbar" aria-label="Filters and sorting for Movies">
+          <fieldset class="ct-filter-group" aria-label="Sort by">
             <label class="ct-sortlabel" for="movies-sort-by">Sort:</label>
             <select id="movies-sort-by">
               <option value="pop-desc">Popularity (desc)</option>
@@ -124,145 +283,169 @@ function ensureMoviesUI() {
     grid = $('#movies-grid');
   }
   bindCollapsible('#filter-toggle', '#filter-panel');
+
+  // Ensure AND/OR exists even if HTML was prebuilt
+  const mForm = document.getElementById('filter-form') || document.querySelector('#filter-panel form');
+  injectModeFieldset({
+    prefix: 'movies',
+    form: mForm,
+    beforeEl: document.getElementById('movies-genre-scroller') || document.getElementById('genre-scroller')
+  });
+
   return grid;
 }
 
-// Query either page-specific or generic controls (to support both HTML variants)
-const MSEL = {
-  sort: () => $('#movies-sort-by') || $('#sort-by'),
-  scroller: () => $('#movies-genre-scroller') || $('#genre-scroller'),
-  applyBtn: () => $('#movies-apply') || $('#apply-filters'),
-  clearBtn: () => $('#movies-clear') || $('#clear-filters'),
-  pager: () => $('#movies-pagination')
-};
-
-function renderMoviesGenreScroller(map) {
+function renderMoviesGenres(map) {
   const scroller = MSEL.scroller();
   if (!scroller) return;
-  const names = Object.values(map).sort((a,b)=>a.localeCompare(b));
-
+  const names = Object.values(map).sort((a, b) => a.localeCompare(b));
   scroller.innerHTML = names.map(n =>
-    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${moviesState.selectedGenres.has(n)}">${n}</button>`
+    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${movies.selectedGenres.has(n)}">${n}</button>`
   ).join('');
-
-  // Click + keyboard toggle, no submit
-  const toggleChip = (btn) => {
-    const n = btn.dataset.name;
-    const on = btn.getAttribute('aria-pressed') === 'true';
-    btn.setAttribute('aria-pressed', String(!on));
-    if (on) moviesState.selectedGenres.delete(n); else moviesState.selectedGenres.add(n);
-  };
-
   $$('.genre-chip', scroller).forEach(btn => {
-    btn.addEventListener('click', () => toggleChip(btn));
+    const toggle = () => {
+      const n = btn.dataset.name;
+      const on = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!on));
+      if (on) movies.selectedGenres.delete(n); else movies.selectedGenres.add(n);
+    };
+    btn.addEventListener('click', toggle);
     btn.addEventListener('keydown', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        toggleChip(btn);
-      }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); }
     });
   });
 }
 
-function sortList(list, sort) {
-  const byTitle = (a,b)=>a.title.localeCompare(b.title,undefined,{sensitivity:'base'});
-  const byYear  = (a,b)=>(parseInt(b.year||0)-parseInt(a.year||0));
-  const byRate  = (a,b)=>(parseFloat(b.rating||0)-parseFloat(a.rating||0));
-  switch(sort){
-    case 'rating-desc': return list.slice().sort(byRate);
-    case 'year-desc':   return list.slice().sort(byYear);
-    case 'year-asc':    return list.slice().sort((a,b)=>-byYear(a,b));
-    case 'title-asc':   return list.slice().sort(byTitle);
-    case 'title-desc':  return list.slice().sort((a,b)=>-byTitle(a,b));
-    default:            return list; // popularity order
-  }
-}
+function renderPager(state, pagerIdPrefix, onChange) {
+  const mount = ensurePagerMount(`${pagerIdPrefix}-pagination`, `${pagerIdPrefix}-grid`);
+  const c = state.page;
+  const nums = [];
+  for (let p = Math.max(1, c - 3); p <= c + 3; p++) nums.push(p);
 
-function applyMoviesFilterSort() {
-  const sortSel = MSEL.sort();
-  const sort = sortSel?.value || 'pop-desc';
-  const genres = Array.from(moviesState.selectedGenres);
+  const makeBtn = (id, label, disabled=false) =>
+    `<button class="btn btn--ghost" id="${id}" ${disabled ? 'disabled' : ''}>${label}</button>`;
 
-  let next = moviesState.source.filter(i => {
-    if (!genres.length) return true;
-    const g = i.genres || [];
-    // OR logic: keep if ANY selected genre is present
-    return genres.some(n => g.includes(n));
+  const numBtns = nums.map(p =>
+    `<button class="btn ${p===c?'btn--primary':'btn--ghost'}" data-page="${p}">${p}</button>`
+  ).join('');
+
+  mount.innerHTML = [
+    makeBtn(`${pagerIdPrefix}-prev`, 'Prev', c <= 1),
+    makeBtn(`${pagerIdPrefix}-jump-left`, '…'),
+    numBtns,
+    makeBtn(`${pagerIdPrefix}-jump-right`, '…'),
+    makeBtn(`${pagerIdPrefix}-next`, 'Next')
+  ].join('');
+
+  const go = (n) => {
+    if (!n || n < 1) return;
+    smartScrollTop();
+    onChange(n);
+    const grid = document.getElementById(`${pagerIdPrefix}-grid`);
+    primeCards(grid);
+    triggerReveals(grid);
+  };
+
+  document.getElementById(`${pagerIdPrefix}-prev`)?.addEventListener('click', () => go(c - 1));
+  document.getElementById(`${pagerIdPrefix}-next`)?.addEventListener('click', () => go(c + 1));
+
+  document.getElementById(`${pagerIdPrefix}-jump-left`)?.addEventListener('click', () => {
+    const val = prompt('Go to page…', String(Math.max(1, c - 10)));
+    const n = Math.max(1, parseInt(val || '1', 10) || 1);
+    go(n);
+  });
+  document.getElementById(`${pagerIdPrefix}-jump-right`)?.addEventListener('click', () => {
+    const val = prompt('Go to page…', String(c + 10));
+    const n = Math.max(1, parseInt(val || String(c + 1), 10) || (c + 1));
+    go(n);
   });
 
-  moviesState.view = sortList(next, sort);
-  moviesState.currentPage = 1;
-  renderMoviesPage();
+  mount.querySelectorAll('button[data-page]')?.forEach(btn => {
+    btn.addEventListener('click', () => go(parseInt(btn.getAttribute('data-page'), 10)));
+  });
 }
 
-function renderMoviesPage() {
-  const grid = $('#movies-grid');
-  if (!grid) return;
+async function renderMovies() {
+  const grid = $('#movies-grid'); if (!grid) return;
 
-  const totalPages = Math.ceil(moviesState.view.length / moviesState.pageSize) || 1;
-  const start = (moviesState.currentPage - 1) * moviesState.pageSize;
-  const pageItems = moviesState.view.slice(start, start + moviesState.pageSize);
+  await ensureViewForPage(movies, movies.page);
 
-  grid.innerHTML = pageItems.length ? pageItems.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
-  revealStaggered(grid);
-
-  const pager = MSEL.pager();
-  if (pager) {
-    pager.innerHTML = `
-      <button class="btn btn--ghost" id="movies-prev" ${moviesState.currentPage===1?'disabled':''}>Prev</button>
-      <span>Page ${moviesState.currentPage} of ${totalPages}</span>
-      <button class="btn btn--ghost" id="movies-next" ${moviesState.currentPage===totalPages?'disabled':''}>Next</button>
-    `;
-    $('#movies-prev')?.addEventListener('click', () => { moviesState.currentPage--; renderMoviesPage(); });
-    $('#movies-next')?.addEventListener('click', () => { moviesState.currentPage++; renderMoviesPage(); });
+  let start = (movies.page - 1) * movies.pageSize;
+  if (movies.view.length <= start && !movies.apiExhausted) {
+    await ensureViewForPage(movies, movies.page);
   }
+
+  start = (movies.page - 1) * movies.pageSize;
+  const slice = movies.view.slice(start, start + movies.pageSize);
+
+  if (!slice.length && movies.page > 1) {
+    movies.page -= 1;
+    return renderMovies();
+  }
+
+  grid.innerHTML = slice.length ? slice.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
+  primeCards(grid);
+  triggerReveals(grid);
+
+  renderPager(movies, 'movies', async (newPage) => {
+    movies.page = newPage;
+    await renderMovies();
+  });
+}
+
+async function applyMovies() {
+  // read genre mode radios
+  const andEl = document.getElementById('movies-mode-and');
+  const orEl  = document.getElementById('movies-mode-or');
+  movies.genreMode = (andEl?.checked ? 'AND' : (orEl?.checked ? 'OR' : movies.genreMode));
+
+  movies.sort = MSEL.sort()?.value || 'pop-desc';
+  buildView(movies);
+  movies.page = 1;
+  await ensureViewForPage(movies, movies.page);
+  await renderMovies();
 }
 
 async function initMoviesPage(){
   if (!location.pathname.toLowerCase().endsWith('movies.html')) return;
-  const grid = ensureMoviesUI();
+  ensureMoviesUI();
   renderSkeletonCards('movies-grid', 8);
-
   try {
-    const [popular, genreList] = await Promise.all([
-      tmdb('movie/popular', { page: 1 }),
-      tmdb('genre/movie/list')
-    ]);
-    const genresMap = {};
-    (genreList.genres || []).forEach(g => genresMap[g.id] = g.name);
+    await fetchMore(movies); // preload first API page
+    buildView(movies);
 
-    const raw = (popular.results || []);
-    moviesState.source = await toMediaList(raw, 'movie');
-    moviesState.view   = moviesState.source.slice();
+    const genreList = await tmdb('genre/movie/list');
+    const gmap = {}; (genreList.genres || []).forEach(g => gmap[g.id] = g.name);
+    renderMoviesGenres(gmap);
 
-    renderMoviesGenreScroller(genresMap);
-    applyMoviesFilterSort();
+    await renderMovies();
 
-    // controls – support both ID schemes
-    MSEL.applyBtn()?.addEventListener('click', applyMoviesFilterSort);
-    MSEL.clearBtn()?.addEventListener('click', () => {
-      moviesState.selectedGenres.clear();
-      const s = MSEL.sort();
-      if (s) s.value = 'pop-desc';
-      renderMoviesGenreScroller(genresMap);
-      applyMoviesFilterSort();
+    // Controls
+    MSEL.apply()?.addEventListener('click', () => applyMovies());
+    MSEL.clear()?.addEventListener('click', async () => {
+      movies.selectedGenres.clear();
+      const s = MSEL.sort(); if (s) s.value = 'pop-desc';
+      $$('.genre-chip', MSEL.scroller()).forEach(b => b.setAttribute('aria-pressed','false'));
+      await applyMovies();
     });
-    MSEL.sort()?.addEventListener('change', applyMoviesFilterSort);
+    MSEL.sort()?.addEventListener('change', () => applyMovies());
+    wireModeChange('movies', () => applyMovies());
   } catch (e) {
     console.error('Movies load error:', e);
-    grid.innerHTML = `<p class="meta">Failed to load movies.</p>`;
+    $('#movies-grid').innerHTML = `<p class="meta">Failed to load movies.</p>`;
   }
 }
 
 /* =======================================================
-   TV PAGE – filters + genres + pagination (15/page)
+   TV page
 ======================================================= */
-const tvState = {
-  source: [],
-  view:   [],
-  currentPage: 1,
-  pageSize: 15,
-  selectedGenres: new Set()
+const tv = makeInfiniteState('tv');
+
+const TVSEL = {
+  sort:     () => $('#tv-sort-by') || $('#sort-by'),
+  scroller: () => $('#tv-genre-scroller') || $('#genre-scroller'),
+  apply:    () => $('#tv-apply') || $('#apply-filters'),
+  clear:    () => $('#tv-clear') || $('#clear-filters'),
 };
 
 function ensureTVUI() {
@@ -276,8 +459,8 @@ function ensureTVUI() {
         <button id="filter-toggle" class="btn btn--ghost" aria-expanded="false" aria-controls="filter-panel" type="button">Filters & Sort</button>
       </div>
       <div id="filter-panel" class="ct-collapsible" hidden>
-        <form id="filter-form" class="ct-filterbar">
-          <fieldset class="ct-filter-group">
+        <form id="filter-form" class="ct-filterbar" aria-label="Filters and sorting for TV">
+          <fieldset class="ct-filter-group" aria-label="Sort by">
             <label class="ct-sortlabel" for="tv-sort-by">Sort:</label>
             <select id="tv-sort-by">
               <option value="pop-desc">Popularity (desc)</option>
@@ -302,117 +485,108 @@ function ensureTVUI() {
     grid = $('#tv-grid');
   }
   bindCollapsible('#filter-toggle', '#filter-panel');
+
+  const tForm = document.getElementById('filter-form') || document.querySelector('#filter-panel form');
+  injectModeFieldset({
+    prefix: 'tv',
+    form: tForm,
+    beforeEl: document.getElementById('tv-genre-scroller') || document.getElementById('genre-scroller')
+  });
+
   return grid;
 }
 
-const TVSEL = {
-  sort: () => $('#tv-sort-by') || $('#sort-by'),
-  scroller: () => $('#tv-genre-scroller') || $('#genre-scroller'),
-  applyBtn: () => $('#tv-apply') || $('#apply-filters'),
-  clearBtn: () => $('#tv-clear') || $('#clear-filters'),
-  pager: () => $('#tv-pagination')
-};
-
-function renderTVGenreScroller(map) {
+function renderTVGenres(map) {
   const scroller = TVSEL.scroller();
   if (!scroller) return;
   const names = Object.values(map).sort((a,b)=>a.localeCompare(b));
-
   scroller.innerHTML = names.map(n =>
-    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${tvState.selectedGenres.has(n)}">${n}</button>`
+    `<button class="genre-chip" type="button" data-name="${n}" aria-pressed="${tv.selectedGenres.has(n)}">${n}</button>`
   ).join('');
-
-  const toggleChip = (btn) => {
-    const n = btn.dataset.name;
-    const on = btn.getAttribute('aria-pressed') === 'true';
-    btn.setAttribute('aria-pressed', String(!on));
-    if (on) tvState.selectedGenres.delete(n); else tvState.selectedGenres.add(n);
-  };
-
   $$('.genre-chip', scroller).forEach(btn => {
-    btn.addEventListener('click', () => toggleChip(btn));
+    const toggle = () => {
+      const n = btn.dataset.name;
+      const on = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!on));
+      if (on) tv.selectedGenres.delete(n); else tv.selectedGenres.add(n);
+    };
+    btn.addEventListener('click', toggle);
     btn.addEventListener('keydown', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        toggleChip(btn);
-      }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); }
     });
   });
 }
 
-function applyTVFilterSort() {
-  const sortSel = TVSEL.sort();
-  const sort = sortSel?.value || 'pop-desc';
-  const genres = Array.from(tvState.selectedGenres);
-
-  let next = tvState.source.filter(i => {
-    if (!genres.length) return true;
-    const g = i.genres || [];
-    // OR logic: keep if ANY selected genre is present
-    return genres.some(n => g.includes(n));
-  });
-
-  tvState.view = sortList(next, sort);
-  tvState.currentPage = 1;
-  renderTVPage();
+function renderTVPager(onChange) {
+  renderPager(tv, 'tv', onChange);
 }
 
-function renderTVPage() {
-  const grid = $('#tv-grid');
-  if (!grid) return;
+async function renderTV() {
+  const grid = $('#tv-grid'); if (!grid) return;
 
-  const totalPages = Math.ceil(tvState.view.length / tvState.pageSize) || 1;
-  const start = (tvState.currentPage - 1) * tvState.pageSize;
-  const pageItems = tvState.view.slice(start, start + tvState.pageSize);
+  await ensureViewForPage(tv, tv.page);
 
-  grid.innerHTML = pageItems.length ? pageItems.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
-  revealStaggered(grid);
-
-  const pager = TVSEL.pager();
-  if (pager) {
-    pager.innerHTML = `
-      <button class="btn btn--ghost" id="tv-prev" ${tvState.currentPage===1?'disabled':''}>Prev</button>
-      <span>Page ${tvState.currentPage} of ${totalPages}</span>
-      <button class="btn btn--ghost" id="tv-next" ${tvState.currentPage===totalPages?'disabled':''}>Next</button>
-    `;
-    $('#tv-prev')?.addEventListener('click', () => { tvState.currentPage--; renderTVPage(); });
-    $('#tv-next')?.addEventListener('click', () => { tvState.currentPage++; renderTVPage(); });
+  let start = (tv.page - 1) * tv.pageSize;
+  if (tv.view.length <= start && !tv.apiExhausted) {
+    await ensureViewForPage(tv, tv.page);
   }
+
+  start = (tv.page - 1) * tv.pageSize;
+  const slice = tv.view.slice(start, start + tv.pageSize);
+
+  if (!slice.length && tv.page > 1) {
+    tv.page -= 1;
+    return renderTV();
+  }
+
+  grid.innerHTML = slice.length ? slice.map(mediaCard).join('') : `<p class="meta">No results found.</p>`;
+  primeCards(grid);
+  triggerReveals(grid);
+
+  renderTVPager(async (newPage) => {
+    tv.page = newPage;
+    await renderTV();
+  });
+}
+
+async function applyTV() {
+  const andEl = document.getElementById('tv-mode-and');
+  const orEl  = document.getElementById('tv-mode-or');
+  tv.genreMode = (andEl?.checked ? 'AND' : (orEl?.checked ? 'OR' : tv.genreMode));
+
+  tv.sort = TVSEL.sort()?.value || 'pop-desc';
+  buildView(tv);
+  tv.page = 1;
+  await ensureViewForPage(tv, tv.page);
+  await renderTV();
 }
 
 async function initTVPage(){
   if (!location.pathname.toLowerCase().endsWith('tv.html')) return;
-  const grid = ensureTVUI();
+  ensureTVUI();
   renderSkeletonCards('tv-grid', 8);
-
   try {
-    const [popular, genreList] = await Promise.all([
-      tmdb('tv/popular', { page: 1 }),
-      tmdb('genre/tv/list')
-    ]);
-    const genresMap = {};
-    (genreList.genres || []).forEach(g => genresMap[g.id] = g.name);
+    await fetchMore(tv);
+    buildView(tv);
 
-    const raw = (popular.results || []);
-    tvState.source = await toMediaList(raw, 'tv');
-    tvState.view   = tvState.source.slice();
+    const genreList = await tmdb('genre/tv/list');
+    const gmap = {}; (genreList.genres || []).forEach(g => gmap[g.id] = g.name);
+    renderTVGenres(gmap);
 
-    renderTVGenreScroller(genresMap);
-    applyTVFilterSort();
+    await renderTV();
 
-    // controls – support both ID schemes
-    TVSEL.applyBtn()?.addEventListener('click', applyTVFilterSort);
-    TVSEL.clearBtn()?.addEventListener('click', () => {
-      tvState.selectedGenres.clear();
-      const s = TVSEL.sort();
-      if (s) s.value = 'pop-desc';
-      renderTVGenreScroller(genresMap);
-      applyTVFilterSort();
+    TVSEL.apply()?.addEventListener('click', () => applyTV());
+    TVSEL.clear()?.addEventListener('click', async () => {
+      tv.selectedGenres.clear();
+      const s = TVSEL.sort(); if (s) s.value = 'pop-desc';
+      $$('.genre-chip', TVSEL.scroller()).forEach(b => b.setAttribute('aria-pressed','false'));
+      await applyTV();
     });
-    TVSEL.sort()?.addEventListener('change', applyTVFilterSort);
+    TVSEL.sort()?.addEventListener('change', () => applyTV());
+    wireModeChange('tv', () => applyTV());
   } catch (e) {
     console.error('TV load error:', e);
-    grid.innerHTML = `<p class="meta">Failed to load TV shows.</p>`;
+    $('#tv-grid').innerHTML = `<p class="meta">Failed to load TV shows.</p>`;
   }
 }
 
@@ -422,12 +596,10 @@ async function initTVPage(){
 (async function(){
   await loadHeaderFooter();
 
-  // Home (index) sections
   await loadTrendingHome();
   await loadMoviesHome();
   await loadTVHome();
 
-  // Dedicated pages
   await initMoviesPage();
   await initTVPage();
 })();

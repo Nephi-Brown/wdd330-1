@@ -267,3 +267,61 @@ footer.ct-footer{ margin-top:40px; background:var(--ct-blue); color:#fff; paddin
 }
 .fav-badge:empty{ display:none; }
 
+/* --- Uniform pill controls in the filter bar --- */
+.ct-filterbar,
+.ct-filter-group { --ct-pill-h: 44px; --ct-pill-px: 16px; }
+
+/* 1) Radio "segment" look (Movies/TV, AND/OR) */
+.ct-segment input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.ct-segment label.btn,
+.ct-segment .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ct-pill-h);
+  padding: 0 var(--ct-pill-px);
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* selected state via :checked + label */
+.ct-segment input[type="radio"]:checked + label.btn {
+  /* use your brand variables if present */
+  border-color: var(--brand-700, #1f3a93);
+  background: var(--brand-50, #eef3ff);
+  color: var(--brand-800, #132a63);
+  box-shadow: 0 0 0 2px var(--brand-200, #cfe0ff) inset;
+}
+
+/* 2) Make the <select> match the same pill height */
+.ct-filterbar select,
+.ct-filterbar .ct-select select {
+  height: var(--ct-pill-h);
+  padding: 0 var(--ct-pill-px);
+  border-radius: 999px;
+  line-height: 1;
+  appearance: none;
+}
+
+/* Optional: wrap selects or standalone buttons with .ct-pill to force pill size */
+.ct-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ct-pill-h);
+  padding: 0 var(--ct-pill-px);
+  border-radius: 999px;
+}
+
+/* Keep groups aligned nicely */
+.ct-filter-group {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}

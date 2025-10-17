@@ -1,6 +1,6 @@
 // js/search-results.js
-// Search results page with collapsible filters, genre scroller (dynamic from loaded cards),
-// skeletons and staggered entrance animations.
+// Search results with filters, AND/OR genre toggle, 15/page pagination,
+// skeletons, staggered reveal, robust scroll-to-top + re-primed reveals.
 
 import {
   loadHeaderFooter,
@@ -11,9 +11,47 @@ import {
 import { tmdb, toMediaList, getGenreMap } from './api.js';
 
 const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const getParam = (k) => new URLSearchParams(location.search).get(k) || '';
 
-/* Card template */
+/* ---------------- Scroll — robust ---------------- */
+function getHeaderOffset() {
+  const header = document.querySelector('header, #main-head');
+  if (!header) return 0;
+  const cs = getComputedStyle(header);
+  const fixedLike = cs.position === 'fixed' || cs.position === 'sticky';
+  return fixedLike ? header.offsetHeight : 0;
+}
+function smartScrollTop() {
+  const targetY = Math.max(0, 0 - getHeaderOffset() - 6);
+  try { window.scrollTo({ top: targetY, behavior: 'smooth' }); }
+  catch { window.scrollTo(0, targetY); }
+  requestAnimationFrame(() => {
+    try { window.scrollTo({ top: targetY, behavior: 'smooth' }); }
+    catch { window.scrollTo(0, targetY); }
+  });
+  setTimeout(() => { window.scrollTo(0, targetY); }, 380);
+}
+
+/* ------------- Reveal re-prime helpers ------------- */
+function primeCards(scope) {
+  const grid = typeof scope === 'string' ? document.getElementById(scope) : scope;
+  if (!grid) return;
+  $$('.card', grid).forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(8px) scale(0.98)';
+    card.classList.remove('is-visible', 'reveal-in', 'io-seen');
+  });
+}
+function triggerReveals(scope) {
+  const grid = typeof scope === 'string' ? document.getElementById(scope) : scope;
+  if (!grid) return;
+  try { revealStaggered(grid); } catch {}
+  requestAnimationFrame(() => { try { revealStaggered(grid); } catch {} });
+  setTimeout(() => { try { revealStaggered(grid); } catch {} }, 380);
+}
+
+/* ---------------- Card template ---------------- */
 function mediaCard(i) {
   const g = i.genres?.length ? ` (${i.genres.join(', ')})` : '';
   const meta = `${i.year || '—'} — ${i.typeLabel}${g}`;
@@ -30,6 +68,7 @@ function mediaCard(i) {
     </a>`;
 }
 
+/* ---------------- Search helpers ---------------- */
 function normalizeTerm(raw) { return raw.trim(); }
 function isYear(term) { return /^\d{4}$/.test(term); }
 
@@ -40,7 +79,6 @@ function findGenreIds(term, genreMap) {
     .map(([id]) => id);
 }
 
-/* ---- Search helpers ---- */
 async function searchByYear(year) {
   const [m, t] = await Promise.all([
     tmdb('discover/movie', { sort_by: 'popularity.desc', primary_release_year: year, page: 1 }),
@@ -70,13 +108,29 @@ async function searchByText(q) {
   });
 }
 
-/* ----------------- Filter/Sort state ----------------- */
-let sourceList = [];   // normalized list from API (mixed movie/tv)
-let viewList   = [];   // filtered/sorted list for rendering
+/* ----------- State: results, filters, paging ----------- */
+let sourceList = [];   // normalized list from API (mixed)
+let viewList   = [];   // filtered/sorted
+
 const selectedGenres = new Set(); // names
+const pageState = { page: 1, pageSize: 15 };
+let genreMode = 'AND';            // <<< NEW: 'AND' | 'OR'
+
 function getSelectedGenres() { return Array.from(selectedGenres); }
 
-/* ---- Genre scroller (Search: from loaded cards only) ---- */
+/* AND/OR genre matcher */
+function matchesGenres(itemGenres, selected, mode) {
+  if (!selected.length) return true;
+  const g = Array.isArray(itemGenres) ? itemGenres : [];
+  if (!g.length) return false;
+  const gLower   = g.map(x => String(x).toLowerCase().trim());
+  const selLower = selected.map(s => String(s).toLowerCase().trim());
+  return mode === 'AND'
+    ? selLower.every(s => gLower.includes(s))
+    : selLower.some(s => gLower.includes(s));
+}
+
+/* ---- Genre scroller (from loaded cards only) ---- */
 function renderGenreScrollerFromList(list) {
   const scroller = $('#genre-scroller');
   if (!scroller) return;
@@ -89,8 +143,8 @@ function renderGenreScrollerFromList(list) {
     `<button class="genre-chip" type="button" data-name="${name}" aria-pressed="${selectedGenres.has(name) ? 'true' : 'false'}">${name}</button>`
   ).join('');
 
-  scroller.querySelectorAll('.genre-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
+  $$('.genre-chip', scroller).forEach(btn => {
+    const toggle = () => {
       const name = btn.getAttribute('data-name');
       const on = btn.getAttribute('aria-pressed') === 'true';
       if (on) {
@@ -100,26 +154,33 @@ function renderGenreScrollerFromList(list) {
         selectedGenres.add(name);
         btn.setAttribute('aria-pressed', 'true');
       }
+    };
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); }
     });
   });
 }
 
-/* ---- Apply filters/sort ---- */
+/* ---- Apply filters/sort (uses AND/OR mode) ---- */
 function applyFilterSort() {
   const movieOn = $('#filter-movie')?.checked ?? true;
   const tvOn    = $('#filter-tv')?.checked ?? true;
   const sortBy  = $('#sort-by')?.value || 'pop-desc';
+  // read genre mode radios if present
+  const andEl = document.getElementById('search-mode-and');
+  const orEl  = document.getElementById('search-mode-or');
+  if (andEl || orEl) {
+    genreMode = (andEl?.checked ? 'AND' : (orEl?.checked ? 'OR' : genreMode));
+  }
+
   const genreNames = getSelectedGenres();
 
   // Filter
   let next = sourceList.filter(i => {
     if (i.type === 'movie' && !movieOn) return false;
     if (i.type === 'tv' && !tvOn) return false;
-    if (genreNames.length) {
-      const names = i.genres || [];
-      if (!genreNames.every(g => names.includes(g))) return false;
-    }
-    return true;
+    return matchesGenres(i.genres, genreNames, genreMode);
   });
 
   // Sort
@@ -136,17 +197,71 @@ function applyFilterSort() {
   }
 
   viewList = next;
+  pageState.page = 1; // reset to first page on filter/sort changes
   renderList();
 }
 
+/* ---- Pagination rendering ---- */
+function ensurePaginationMount() {
+  let mount = $('#search-pagination');
+  if (!mount) {
+    mount = document.createElement('div');
+    mount.id = 'search-pagination';
+    mount.className = 'ct-pagination';
+    mount.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:1rem;margin-top:1rem;';
+    const section = $('#search-grid')?.parentElement || $('main');
+    section?.appendChild(mount);
+  }
+  return mount;
+}
+
+function renderPagination() {
+  const total = viewList.length;
+  const { page, pageSize } = pageState;
+  const start = (page - 1) * pageSize;
+  const hasPrev = page > 1;
+  const hasNext = (start + pageSize) < total;
+
+  const mount = ensurePaginationMount();
+  mount.innerHTML = `
+    <button id="search-prev" class="btn btn--ghost" ${hasPrev ? '' : 'disabled'}>Prev</button>
+    <span>${total ? (Math.min(total, start + 1) + '–' + Math.min(total, start + pageSize)) : '0–0'} of ${total}</span>
+    <button id="search-next" class="btn btn--ghost" ${hasNext ? '' : 'disabled'}>Next</button>
+  `;
+
+  const go = (n) => {
+    if (!n) return;
+    smartScrollTop();
+    pageState.page = n;
+    renderList();
+  };
+
+  $('#search-prev')?.addEventListener('click', () => { if (pageState.page > 1) go(pageState.page - 1); });
+  $('#search-next')?.addEventListener('click', () => {
+    const newStart = pageState.page * pageState.pageSize;
+    if (newStart < total) go(pageState.page + 1);
+  });
+}
+
+/* ---- List render (paged) ---- */
 function renderList() {
   const grid = $('#search-grid');
   if (!grid) return;
-  grid.innerHTML = viewList.length
-    ? viewList.map(mediaCard).join('')
+  const { page, pageSize } = pageState;
+  const start = (page - 1) * pageSize;
+  const slice = viewList.slice(start, start + pageSize);
+
+  grid.innerHTML = slice.length
+    ? slice.map(mediaCard).join('')
     : `<p class="meta">No results. Adjust your filters or try another query.</p>`;
-  $('#results-sub').textContent = `${viewList.length} result${viewList.length === 1 ? '' : 's'}`;
-  revealStaggered(grid);
+  const sub = $('#results-sub');
+  if (sub) sub.textContent = `${viewList.length} result${viewList.length === 1 ? '' : 's'}`;
+
+  // re-prime + multi-reveal
+  primeCards(grid);
+  triggerReveals(grid);
+
+  renderPagination();
 }
 
 /* ----------------- Main search flow ----------------- */
@@ -161,6 +276,37 @@ async function runSearch() {
   if (title) title.textContent = q ? `Results for “${q}”` : 'Search';
   const grid  = $('#search-grid');
   const sub   = $('#results-sub');
+
+  // If your HTML doesn't already include the AND/OR UI, inject it:
+  const filterForm = document.getElementById('filter-form') || document.querySelector('#filter-panel form');
+  if (filterForm && !document.getElementById('search-mode-and')) {
+    const modeFieldset = document.createElement('fieldset');
+    modeFieldset.className = 'ct-filter-group';
+    modeFieldset.setAttribute('aria-label', 'Genre matching mode');
+    modeFieldset.style.display = 'flex';
+    modeFieldset.style.alignItems = 'center';
+    modeFieldset.style.gap = '.5rem';
+    modeFieldset.style.flexWrap = 'wrap';
+    modeFieldset.innerHTML = `
+      <label class="ct-sortlabel" for="search-genre-mode">Match:</label>
+      <div class="ct-segment">
+        <input type="radio" id="search-mode-and" name="search-genre-mode" value="AND" checked>
+        <label for="search-mode-and" class="btn btn--ghost">All (AND)</label>
+        <input type="radio" id="search-mode-or"  name="search-genre-mode" value="OR">
+        <label for="search-mode-or" class="btn btn--ghost">Any (OR)</label>
+      </div>
+    `;
+    // Insert it just before the genre scroller if present, else before actions
+    const scroller = document.getElementById('genre-scroller');
+    const actions  = document.getElementById('apply-filters')?.closest('.ct-filter-actions');
+    if (scroller?.parentElement) {
+      scroller.parentElement.insertBefore(modeFieldset, scroller);
+    } else if (actions?.parentElement) {
+      actions.parentElement.insertBefore(modeFieldset, actions);
+    } else {
+      filterForm.appendChild(modeFieldset);
+    }
+  }
 
   if (!q) {
     if (sub) sub.textContent = 'Try searching for a title, genre, or year.';
@@ -179,13 +325,18 @@ async function runSearch() {
       raw = genreHits.length ? genreHits : await searchByText(q);
     }
 
-    sourceList = await toMediaList(raw.slice(0, 60)); // normalize cards
+    sourceList = await toMediaList(raw.slice(0, 200)); // normalize more; paginate locally
     viewList = [...sourceList];
 
     // Build dynamic genre scroller from loaded cards
     renderGenreScrollerFromList(sourceList);
 
+    // Wire AND/OR mode changes
+    document.getElementById('search-mode-and')?.addEventListener('change', () => applyFilterSort());
+    document.getElementById('search-mode-or')?.addEventListener('change', () => applyFilterSort());
+
     // Initial render
+    pageState.page = 1;
     renderList();
 
     // Wire filter controls
@@ -195,6 +346,12 @@ async function runSearch() {
       if (m) m.checked = true;
       if (t) t.checked = true;
       if (s) s.value = 'pop-desc';
+      // reset mode to AND
+      const andEl = document.getElementById('search-mode-and');
+      const orEl  = document.getElementById('search-mode-or');
+      if (andEl) andEl.checked = true;
+      if (orEl)  orEl.checked  = false;
+      genreMode = 'AND';
       selectedGenres.clear();
       renderGenreScrollerFromList(sourceList); // reset chips
       applyFilterSort();
