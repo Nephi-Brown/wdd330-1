@@ -8,7 +8,7 @@
 // - Skeleton loaders
 // - Collapsible panel (Filter & Sort)
 // - Staggered entrance reveal
-// - Card Flip navigation to details
+// - Card Flip navigation to details (WAAPI two-layer 180° flip)
 // - Small storage + DOM helpers
 
 /* --------------------------------------
@@ -268,12 +268,13 @@ export function revealStaggered(containerOrSelector, itemSelector = '.card', ste
 }
 
 /* --------------------------------------
-   Card Flip before navigating to details
-   (hardened: double RAF, webkit end event, inline animation fallback)
+   Card Flip Navigation — true 180° flip using WAAPI
+   - Outer rotates 0 → 180°
+   - Inner counter-rotates 0 → -180° so the face stays visible
 --------------------------------------- */
 export function enableCardFlipNavigation({
   selector = '.card',
-  durationMs = 380,
+  durationMs = 600, // readable full flip
   detailsRegex = /(^|\/)details\.html(\?|#|$)/i
 } = {}) {
   if (document.documentElement.dataset.ctFlipBound === '1') return;
@@ -294,7 +295,6 @@ export function enableCardFlipNavigation({
     const targetAttr = anchor.getAttribute('target');
     if (targetAttr && targetAttr.toLowerCase() === '_blank') return;
 
-    // Don’t animate on actual buttons/controls
     if (e.target.closest('.btn,[data-skip-flip]')) return;
     if (prefersReduced) return;
 
@@ -303,66 +303,124 @@ export function enableCardFlipNavigation({
 
     e.preventDefault();
 
+    // Metrics
     const rect = card.getBoundingClientRect();
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const cardCx = rect.left + rect.width / 2;
+    const cardCy = rect.top + rect.height / 2;
+    const dx = cx - cardCx;
+    const dy = cy - cardCy;
+
+    // Stage for consistent perspective
+    const stage = document.createElement('div');
+    stage.className = 'ct-flip-stage';
+    Object.assign(stage.style, {
+      position: 'fixed',
+      left: '0', top: '0',
+      width: '100vw', height: '100vh',
+      zIndex: '9998',
+      pointerEvents: 'none',
+      perspective: '1000px',
+      WebkitPerspective: '1000px'
+    });
+
+    // Clone + inner wrapper
     const clone = card.cloneNode(true);
     clone.classList.add('ct-flip-clone');
+    Object.assign(clone.style, {
+      position: 'fixed',
+      left: rect.left + 'px',
+      top: rect.top + 'px',
+      width: rect.width + 'px',
+      height: rect.height + 'px',
+      zIndex: '9999',
+      margin: '0',
+      transformOrigin: 'center center',
+      transformStyle: 'preserve-3d',
+      WebkitTransformStyle: 'preserve-3d',
+      willChange: 'transform, opacity, filter',
+      backfaceVisibility: 'hidden',
+      WebkitBackfaceVisibility: 'hidden',
+      pointerEvents: 'none',
+      overflow: 'hidden'
+    });
 
-    // Position/size from viewport rect
-    clone.style.position = 'fixed';
-    clone.style.left = rect.left + 'px';
-    clone.style.top = rect.top + 'px';
-    clone.style.width = rect.width + 'px';
-    clone.style.height = rect.height + 'px';
-    clone.style.zIndex = '9999';
-    // GPU/compositor hints
-    clone.style.willChange = 'transform,opacity,filter';
-    clone.style.transform = 'translateZ(0)';
-    clone.style.backfaceVisibility = 'hidden';
-    clone.style.webkitBackfaceVisibility = 'hidden';
-    clone.style.transformStyle = 'preserve-3d';
-    clone.style.webkitTransformStyle = 'preserve-3d';
-    // prevent inner hover transitions on the clone
-    clone.querySelectorAll('img').forEach(img => {
-      img.style.transition = 'none';
-      img.style.transform = 'none';
+    const inner = document.createElement('div');
+    inner.className = 'ct-flip-inner';
+    Object.assign(inner.style, {
+      width: '100%',
+      height: '100%',
+      transformOrigin: 'center center',
+      transformStyle: 'preserve-3d',
+      WebkitTransformStyle: 'preserve-3d',
+      backfaceVisibility: 'hidden',
+      WebkitBackfaceVisibility: 'hidden',
+      willChange: 'transform, opacity'
+    });
+
+    // Move original clone children into inner
+    while (clone.firstChild) inner.appendChild(clone.firstChild);
+    clone.appendChild(inner);
+
+    // Kill hover transitions inside the clone
+    inner.querySelectorAll('img, .card__img').forEach(el => {
+      el.style.transition = 'none';
+      el.style.transform = 'none';
     });
 
     const oldVisibility = card.style.visibility;
     card.style.visibility = 'hidden';
-    document.body.appendChild(clone);
-
-    // Double RAF so initial styles are committed before starting the animation
-    const startAnim = () => {
-      const timing = 'cubic-bezier(.22,.61,.36,1)';
-      // Inline animation as a fallback even if CSS class fails to apply
-      clone.style.animation = `ct-flip-zoom ${durationMs}ms ${timing} forwards`;
-      clone.style.webkitAnimation = `ct-flip-zoom ${durationMs}ms ${timing} forwards`;
-      clone.classList.add('ct-flip-animate');
-    };
-
-    requestAnimationFrame(() => {
-      // force layout
-      // eslint-disable-next-line no-unused-expressions
-      clone.offsetHeight;
-      requestAnimationFrame(startAnim);
-    });
+    document.body.appendChild(stage);
+    stage.appendChild(clone);
 
     const navigate = () => {
+      try { stage.remove(); } catch {}
       try { clone.remove(); } catch {}
       card.style.visibility = oldVisibility;
       window.location.href = anchor.href;
     };
 
-    const onEnd = () => {
-      clearTimeout(fallbackTimer);
-      navigate();
-    };
-    // Some WebKit builds only fire webkitAnimationEnd
-    clone.addEventListener('animationend', onEnd, { once: true });
-    clone.addEventListener('webkitAnimationEnd', onEnd, { once: true });
+    const easing = 'cubic-bezier(.22,.61,.36,1)';
 
-    // Fallback in case no event fires
-    const fallbackTimer = setTimeout(navigate, durationMs + 150);
+    if (clone.animate && inner.animate) {
+      // Outer: move to center + rotate to 180
+      const flip = clone.animate(
+        [
+          { transform: 'translate(0px, 0px) scale(1) rotateY(0deg)', opacity: 1, filter: 'none', offset: 0 },
+          { transform: `translate(${dx}px, ${dy}px) scale(1.06) rotateY(90deg)`,  opacity: 0.6, offset: 0.5 },
+          { transform: `translate(${dx}px, ${dy}px) scale(1.15) rotateY(180deg)`, opacity: 0.18, filter: 'blur(1px)', offset: 1 }
+        ],
+        { duration: durationMs, easing, fill: 'forwards' }
+      );
+
+      // Inner: counter-rotate to keep the face visible
+      const counter = inner.animate(
+        [
+          { transform: 'rotateY(0deg)',   offset: 0 },
+          { transform: 'rotateY(-90deg)', offset: 0.5 },
+          { transform: 'rotateY(-180deg)',offset: 1 }
+        ],
+        { duration: durationMs, easing, fill: 'forwards' }
+      );
+
+      // When both finish, navigate
+      Promise.all([
+        flip.finished.catch(() => {}),
+        counter.finished.catch(() => {})
+      ]).then(() => navigate());
+
+      // Safety fallback in case finished never fires
+      setTimeout(navigate, durationMs + 220);
+    } else {
+      // CSS fallback (rare)
+      const startAnim = () => { clone.classList.add('ct-flip-animate'); };
+      requestAnimationFrame(() => { clone.offsetHeight; requestAnimationFrame(startAnim); });
+      const onEnd = () => { clearTimeout(fallbackTimer); navigate(); };
+      clone.addEventListener('animationend', onEnd, { once: true });
+      clone.addEventListener('webkitAnimationEnd', onEnd, { once: true });
+      const fallbackTimer = setTimeout(navigate, durationMs + 240);
+    }
   }, true);
 }
 
