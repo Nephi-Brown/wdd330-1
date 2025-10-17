@@ -431,3 +431,72 @@ footer.ct-footer {
 @media (max-width: 640px){
   .ct-nav{ flex-wrap: wrap; gap: 12px; padding: 8px 0 10px; }
 }
+
+/* =========================================
+   MOBILE HEADER ICON ALIGNMENT FIX
+   Ensure hamburger + favorites stay right-aligned on mobile
+   ========================================= */
+
+@media (max-width: 640px) {
+  .ct-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  /* Reorder items for better mobile flow:
+     1️⃣ Brand (logo + name)
+     2️⃣ Search bar full width
+     3️⃣ Icons (hamburger + favorites) right side
+  */
+  .ct-brand {
+    order: 1;
+    flex: 0 1 auto;
+  }
+
+  .ct-search {
+    order: 2;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .ct-actions-right {
+    order: 3;
+    flex: 0 1 auto;
+    margin-left: auto; /* push all icons to far right */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Adjust individual icons for consistent sizing */
+  #menu {
+    width: 26px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+
+  .fav-link img,
+  .fav-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* Optional: tighter gap and alignment */
+  .ct-actions-right .fav-link {
+    gap: 4px;
+  }
+}
+
+/* <= 380px: hide CineTrack wordmark to save space */
+@media (max-width: 380px) {
+  .ct-brand__name {
+    display: none;
+  }
+}
+
